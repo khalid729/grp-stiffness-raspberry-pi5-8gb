@@ -1,4 +1,5 @@
 import snap7
+from snap7.client import Areas
 from snap7.util import get_real, set_real, get_int, get_bool, set_bool
 import threading
 import logging
@@ -142,3 +143,66 @@ class PLCConnector:
         except Exception as e:
             logger.error(f"Error writing Int to DB{db_number}.{offset}: {e}")
             return False
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DIRECT HARDWARE I/O - Read directly from physical inputs (PE Area)
+    # No PLC programming needed for these signals!
+    # ══════════════════════════════════════════════════════════════════════
+
+    def read_input_bit(self, byte_offset: int, bit: int) -> Optional[bool]:
+        """Read digital input directly from hardware (I0.0, I0.1, etc.)
+
+        Args:
+            byte_offset: Byte number (0 for I0.x, 1 for I1.x)
+            bit: Bit number (0-7)
+
+        Returns:
+            bool value or None if error
+        """
+        if not self.connected:
+            return None
+        try:
+            with self.lock:
+                data = self.client.read_area(Areas.PE, 0, byte_offset, 1)
+                return get_bool(data, 0, bit)
+        except Exception as e:
+            logger.error(f"Error reading input I{byte_offset}.{bit}: {e}")
+            return None
+
+    def read_input_byte(self, byte_offset: int) -> Optional[int]:
+        """Read full input byte (IB0, IB1, etc.)
+
+        Args:
+            byte_offset: Byte number (0 for IB0, 1 for IB1)
+
+        Returns:
+            Byte value (0-255) or None if error
+        """
+        if not self.connected:
+            return None
+        try:
+            with self.lock:
+                data = self.client.read_area(Areas.PE, 0, byte_offset, 1)
+                return data[0]
+        except Exception as e:
+            logger.error(f"Error reading input byte IB{byte_offset}: {e}")
+            return None
+
+    def read_analog_input(self, address: int) -> Optional[int]:
+        """Read analog input word (IW64, IW66, etc.)
+
+        Args:
+            address: Word address (64 for IW64, 66 for IW66)
+
+        Returns:
+            Raw value (0-27648 for 0-10V) or None if error
+        """
+        if not self.connected:
+            return None
+        try:
+            with self.lock:
+                data = self.client.read_area(Areas.PE, 0, address, 2)
+                return get_int(data, 0)
+        except Exception as e:
+            logger.error(f"Error reading analog input IW{address}: {e}")
+            return None

@@ -11,8 +11,11 @@ export interface LiveData {
   servo_ready: boolean;
   servo_error: boolean;
   at_home: boolean;
-  lock_upper: boolean;
-  lock_lower: boolean;
+  upper_limit: boolean;
+  lower_limit: boolean;
+  e_stop: boolean;
+  start_button: boolean;
+  load_cell_raw: number;
   actual_position: number;
   connected: boolean;
 }

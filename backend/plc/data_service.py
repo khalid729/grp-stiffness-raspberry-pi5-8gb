@@ -6,8 +6,26 @@ logger = logging.getLogger(__name__)
 
 
 class DataService:
-    """Service for reading data from PLC Data Blocks"""
+    """Service for reading data from PLC - using Direct I/O and Data Blocks"""
 
+    # ══════════════════════════════════════════════════════════════════════
+    # DIRECT HARDWARE INPUTS (PE Area) - No PLC programming needed!
+    # ══════════════════════════════════════════════════════════════════════
+    # Byte 0 (I0.x)
+    INPUT_SERVO_READY = (0, 0)      # I0.0
+    INPUT_SERVO_ERROR = (0, 1)      # I0.1
+    INPUT_AT_HOME = (0, 2)          # I0.2
+    INPUT_UPPER_LIMIT = (0, 3)      # I0.3
+    INPUT_LOWER_LIMIT = (0, 4)      # I0.4
+    INPUT_E_STOP = (0, 6)           # I0.6
+    INPUT_START_BUTTON = (0, 7)     # I0.7
+
+    # Analog Inputs
+    ANALOG_LOAD_CELL = 64           # IW64 (0-27648 = 0-200 kN)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DATA BLOCKS - For calculated/processed values
+    # ══════════════════════════════════════════════════════════════════════
     # DB1 - Test Parameters offsets
     DB1_PIPE_DIAMETER = 0
     DB1_PIPE_LENGTH = 4
@@ -26,17 +44,18 @@ class DataService:
     DB2_TEST_STATUS = 22
     DB2_TEST_PASSED = 24
 
-    # DB3 - Servo Status offsets
-    DB3_SERVO_READY_BYTE = 1
-    DB3_SERVO_READY_BIT = 0
-    DB3_SERVO_ERROR_BIT = 1
-    DB3_AT_HOME_BIT = 2
-    DB3_LOCK_UPPER_BIT = 3
-    DB3_LOCK_LOWER_BIT = 4
-    DB3_ACTUAL_POSITION = 6
+    # Load cell scaling constants
+    LOAD_CELL_MAX_RAW = 27648
+    LOAD_CELL_MAX_FORCE = 200.0  # kN
 
     def __init__(self, plc: PLCConnector):
         self.plc = plc
+
+    def _scale_load_cell(self, raw_value: int) -> float:
+        """Scale raw analog value (0-27648) to kN (0-200)"""
+        if raw_value is None or raw_value < 0:
+            return 0.0
+        return (raw_value / self.LOAD_CELL_MAX_RAW) * self.LOAD_CELL_MAX_FORCE
 
     def get_live_data(self) -> Dict[str, Any]:
         """Read all real-time values for dashboard - called every 100ms"""
@@ -44,8 +63,25 @@ class DataService:
             return self._get_disconnected_data()
 
         try:
+            # Read load cell raw value for scaling
+            load_cell_raw = self.plc.read_analog_input(self.ANALOG_LOAD_CELL) or 0
+
             return {
-                # DB2 - Test Results
+                # ═══════════════════════════════════════════════════════════
+                # DIRECT FROM HARDWARE (I/O) - No PLC programming needed!
+                # ═══════════════════════════════════════════════════════════
+                "servo_ready": self.plc.read_input_bit(*self.INPUT_SERVO_READY) or False,
+                "servo_error": self.plc.read_input_bit(*self.INPUT_SERVO_ERROR) or False,
+                "at_home": self.plc.read_input_bit(*self.INPUT_AT_HOME) or False,
+                "upper_limit": self.plc.read_input_bit(*self.INPUT_UPPER_LIMIT) or False,
+                "lower_limit": self.plc.read_input_bit(*self.INPUT_LOWER_LIMIT) or False,
+                "e_stop": self.plc.read_input_bit(*self.INPUT_E_STOP) or False,
+                "start_button": self.plc.read_input_bit(*self.INPUT_START_BUTTON) or False,
+                # Load cell - direct analog with Python scaling
+                "load_cell_raw": load_cell_raw,
+                # ═══════════════════════════════════════════════════════════
+                # FROM DATA BLOCKS (Calculated/Processed values)
+                # ═══════════════════════════════════════════════════════════
                 "actual_force": self.plc.read_real(2, self.DB2_ACTUAL_FORCE) or 0.0,
                 "actual_deflection": self.plc.read_real(2, self.DB2_ACTUAL_DEFLECTION) or 0.0,
                 "target_deflection": self.plc.read_real(2, self.DB2_TARGET_DEFLECTION) or 0.0,
@@ -54,13 +90,8 @@ class DataService:
                 "sn_class": self.plc.read_int(2, self.DB2_SN_CLASS) or 0,
                 "test_status": self.plc.read_int(2, self.DB2_TEST_STATUS) or 0,
                 "test_passed": self.plc.read_bool(2, self.DB2_TEST_PASSED, 0) or False,
-                # DB3 - Servo Status
-                "servo_ready": self.plc.read_bool(3, self.DB3_SERVO_READY_BYTE, self.DB3_SERVO_READY_BIT) or False,
-                "servo_error": self.plc.read_bool(3, self.DB3_SERVO_READY_BYTE, self.DB3_SERVO_ERROR_BIT) or False,
-                "at_home": self.plc.read_bool(3, self.DB3_SERVO_READY_BYTE, self.DB3_AT_HOME_BIT) or False,
-                "lock_upper": self.plc.read_bool(3, self.DB3_SERVO_READY_BYTE, self.DB3_LOCK_UPPER_BIT) or False,
-                "lock_lower": self.plc.read_bool(3, self.DB3_SERVO_READY_BYTE, self.DB3_LOCK_LOWER_BIT) or False,
-                "actual_position": self.plc.read_real(3, self.DB3_ACTUAL_POSITION) or 0.0,
+                # Position from DB2 or calculated
+                "actual_position": self.plc.read_real(2, self.DB2_ACTUAL_DEFLECTION) or 0.0,
                 # Connection status
                 "connected": True,
             }
@@ -82,8 +113,11 @@ class DataService:
             "servo_ready": False,
             "servo_error": False,
             "at_home": False,
-            "lock_upper": False,
-            "lock_lower": False,
+            "upper_limit": False,
+            "lower_limit": False,
+            "e_stop": False,
+            "start_button": False,
+            "load_cell_raw": 0,
             "actual_position": 0.0,
             "connected": False,
         }

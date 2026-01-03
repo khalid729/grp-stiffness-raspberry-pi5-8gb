@@ -14,8 +14,11 @@ const defaultLiveData: LiveData = {
   servo_ready: false,
   servo_error: false,
   at_home: false,
-  lock_upper: false,
-  lock_lower: false,
+  upper_limit: false,
+  lower_limit: false,
+  e_stop: false,
+  start_button: false,
+  load_cell_raw: 0,
   actual_position: 0,
   connected: false,
 };
