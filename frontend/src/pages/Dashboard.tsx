@@ -1,28 +1,34 @@
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect, useMemo } from 'react';
 import { StatusCard } from '@/components/dashboard/StatusCard';
 import { MachineIndicator } from '@/components/dashboard/MachineIndicator';
 import { TestStatusBadge } from '@/components/dashboard/TestStatusBadge';
 import { ForceDeflectionChart } from '@/components/dashboard/ForceDeflectionChart';
-import { Button } from '@/components/ui/button';
+import { ModeSelector } from '@/components/ModeSelector';
+import { TouchButton } from '@/components/ui/TouchButton';
+import { EStopButton } from '@/components/ui/EStopButton';
 import { Gauge, Move, Target, Activity, Home, Play, Square } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { useLiveData } from '@/hooks/useLiveData';
-import { useCommands } from '@/hooks/useApi';
-import { socketClient } from '@/api/socket';
+import { useCommands, useModeControl } from '@/hooks/useApi';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Dashboard = () => {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { liveData, isConnected } = useLiveData();
   const { startTest, stopTest, goHome } = useCommands();
+  const { setMode } = useModeControl();
 
   // Chart data - accumulate from live data
   const [chartData, setChartData] = useState<{ deflection: number; force: number }[]>([]);
 
+  // Mode state
+  const isLocalMode = !liveData.remote_mode;
+  const controlsDisabled = isLocalMode || !isConnected;
+  const isTestRunning = liveData.test_status === 2;
+
   // Update chart data when testing
   useEffect(() => {
-    if (liveData.test_status === 2) { // Testing
+    if (liveData.test_status === 2) {
       setChartData(prev => {
-        // Avoid duplicates
         const lastPoint = prev[prev.length - 1];
         if (lastPoint &&
             Math.abs(lastPoint.deflection - liveData.actual_deflection) < 0.01) {
@@ -33,27 +39,22 @@ const Dashboard = () => {
           force: liveData.actual_force,
         }];
       });
-    } else if (liveData.test_status === 0) { // Idle - reset chart
-      // Keep chart data until new test starts
-    } else if (liveData.test_status === 1) { // Starting - clear for new test
+    } else if (liveData.test_status === 1) {
       setChartData([]);
     }
   }, [liveData.actual_deflection, liveData.actual_force, liveData.test_status]);
 
-  // Listen for test complete event
-  useEffect(() => {
-    const unsubscribe = socketClient.on('test_complete', (data) => {
-      console.log('Test complete:', data);
-    });
-    return unsubscribe;
-  }, []);
+  // Call real API to change mode in PLC
+  const handleModeChange = (remoteMode: boolean) => {
+    setMode.mutate(remoteMode);
+  };
 
   const handleHome = () => {
     goHome.mutate();
   };
 
   const handleStartTest = () => {
-    setChartData([]); // Clear previous chart
+    setChartData([]);
     startTest.mutate();
   };
 
@@ -61,57 +62,82 @@ const Dashboard = () => {
     stopTest.mutate();
   };
 
-  // Map test status to the expected format
   const testStatus = liveData.test_status as 0 | 1 | 2 | 3 | 4 | 5 | -1;
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col space-y-4 p-1 min-h-0">
-      {/* Page Title + Quick Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-4 md:gap-6 animate-slide-up">
+      {/* Header */}
+      <div className="page-header">
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl lg:text-2xl font-bold">{t('nav.dashboard')}</h1>
           <TestStatusBadge status={testStatus} />
           {!isConnected && (
-            <span className="text-xs text-destructive animate-pulse">PLC Disconnected</span>
+            <span className="connection-bar disconnected">
+              <span className="w-2 h-2 rounded-full bg-current" />
+              {t('connection.disconnected')}
+            </span>
           )}
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2">
-          <Button
+        {/* Mode Selector - Compact */}
+        <ModeSelector
+          remoteMode={liveData.remote_mode}
+          onModeChange={handleModeChange}
+          isTestRunning={isTestRunning}
+          variant="compact"
+        />
+      </div>
+
+      {/* Quick Action Buttons */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Control Buttons */}
+        <div className="grid grid-cols-3 gap-3 flex-1 min-w-0">
+          <TouchButton
             variant="outline"
             onClick={handleHome}
-            size="sm"
-            className="gap-1.5"
-            disabled={!isConnected || goHome.isPending}
+            disabled={controlsDisabled || goHome.isPending}
+            className="gap-2"
           >
-            <Home className="w-4 h-4" />
-            Home
-          </Button>
-          <Button
+            <Home className="w-5 h-5" />
+            {t('actions.home')}
+          </TouchButton>
+          <TouchButton
+            variant="success"
             onClick={handleStartTest}
-            disabled={!isConnected || !liveData.servo_ready || liveData.servo_error || liveData.test_status === 2 || startTest.isPending}
-            size="sm"
-            className="gap-1.5 bg-success hover:bg-success/90 text-success-foreground"
+            disabled={controlsDisabled || !liveData.servo_ready || liveData.servo_error || isTestRunning || startTest.isPending}
+            className="gap-2"
           >
-            <Play className="w-4 h-4" />
-            Start
-          </Button>
-          <Button
+            <Play className="w-5 h-5" />
+            {t('actions.start')}
+          </TouchButton>
+          <TouchButton
             variant="destructive"
             onClick={handleStop}
-            size="sm"
-            className="gap-1.5"
-            disabled={stopTest.isPending}
+            disabled={controlsDisabled || stopTest.isPending}
+            className="gap-2"
           >
-            <Square className="w-4 h-4" />
-            Stop
-          </Button>
+            <Square className="w-5 h-5" />
+            {t('actions.stop')}
+          </TouchButton>
+        </div>
+        
+        {/* Separator */}
+        <div className="hidden md:flex items-center h-16 px-2">
+          <div className="w-px h-full bg-border/50"></div>
+        </div>
+        
+        {/* E-Stop - Isolated Emergency Control */}
+        <div className="flex-shrink-0 p-2 rounded-xl bg-destructive/5 border border-destructive/20">
+          <EStopButton 
+            size="md"
+            label={t('actions.eStop')}
+            onClick={handleStop}
+          />
         </div>
       </div>
 
       {/* Status Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
+      <div className="status-grid">
         <StatusCard
           title={t('dashboard.force')}
           value={liveData.actual_force.toFixed(2)}
@@ -141,7 +167,7 @@ const Dashboard = () => {
       </div>
 
       {/* Chart Section */}
-      <div className="industrial-card p-4 min-h-[300px] flex-shrink-0">
+      <div className="chart-container relative">
         <ForceDeflectionChart
           data={chartData}
           targetDeflection={liveData.target_deflection}
@@ -149,28 +175,30 @@ const Dashboard = () => {
       </div>
 
       {/* Machine Indicators */}
-      <div className="industrial-card p-4 flex-shrink-0">
-        <h3 className="text-sm lg:text-base font-semibold mb-3">{t('dashboard.machineIndicators')}</h3>
+      <div className="industrial-card p-4">
+        <h3 className="text-sm lg:text-base font-semibold mb-3 text-muted-foreground">
+          {t('dashboard.machineIndicators')}
+        </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <MachineIndicator
-            label="Servo Ready"
+            label={t('dashboard.servoReady')}
             isActive={liveData.servo_ready}
           />
           <MachineIndicator
-            label="Servo Error"
+            label={t('dashboard.servoError')}
             isActive={liveData.servo_error}
             isError={liveData.servo_error}
           />
           <MachineIndicator
-            label="Upper Lock"
+            label={t('dashboard.upperLock')}
             isActive={liveData.lock_upper}
           />
           <MachineIndicator
-            label="Lower Lock"
+            label={t('dashboard.lowerLock')}
             isActive={liveData.lock_lower}
           />
           <MachineIndicator
-            label="At Home"
+            label={t('dashboard.atHome')}
             isActive={liveData.at_home}
           />
         </div>

@@ -1,42 +1,38 @@
-import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-
-type TestStatus = 0 | 1 | 2 | 3 | 4 | 5 | -1;
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface TestStatusBadgeProps {
-  status: TestStatus;
-  className?: string;
+  status: 0 | 1 | 2 | 3 | 4 | 5 | -1;
 }
 
-const statusConfig: Record<TestStatus, { key: string; colorClass: string }> = {
-  0: { key: 'idle', colorClass: 'bg-status-idle text-white' },
-  1: { key: 'starting', colorClass: 'bg-status-starting text-white' },
-  2: { key: 'testing', colorClass: 'bg-status-testing text-black' },
-  3: { key: 'atTarget', colorClass: 'bg-status-target text-white' },
-  4: { key: 'returning', colorClass: 'bg-status-returning text-white' },
-  5: { key: 'complete', colorClass: 'bg-status-complete text-white' },
-  '-1': { key: 'error', colorClass: 'bg-status-error text-white animate-blink' },
+const statusConfig: Record<number, { 
+  key: string; 
+  variant: string; 
+  animate?: boolean;
+}> = {
+  [-1]: { key: 'disconnected', variant: 'bg-destructive/20 text-destructive border-destructive/30' },
+  0: { key: 'idle', variant: 'bg-muted text-muted-foreground border-border' },
+  1: { key: 'starting', variant: 'bg-info/20 text-info border-info/30', animate: true },
+  2: { key: 'testing', variant: 'bg-warning/20 text-warning border-warning/30', animate: true },
+  3: { key: 'atTarget', variant: 'bg-success/20 text-success border-success/30' },
+  4: { key: 'returning', variant: 'bg-info/20 text-info border-info/30', animate: true },
+  5: { key: 'complete', variant: 'bg-success/20 text-success border-success/30' },
 };
 
-export const TestStatusBadge = ({ status, className }: TestStatusBadgeProps) => {
-  const { t } = useTranslation();
-  const config = statusConfig[status];
-
+export function TestStatusBadge({ status }: TestStatusBadgeProps) {
+  const { t } = useLanguage();
+  const config = statusConfig[status] || statusConfig[0];
+  
   return (
-    <div
-      className={cn(
-        'inline-flex items-center px-4 py-2 rounded-full font-semibold text-sm uppercase tracking-wide',
-        config.colorClass,
-        className
+    <span className={cn(
+      'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border',
+      config.variant,
+      config.animate && 'animate-pulse-glow'
+    )}>
+      {config.animate && (
+        <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
       )}
-    >
-      <div
-        className={cn(
-          'w-2 h-2 rounded-full mr-2',
-          status === -1 ? 'bg-white' : 'bg-white/80'
-        )}
-      />
       {t(`status.${config.key}`)}
-    </div>
+    </span>
   );
-};
+}

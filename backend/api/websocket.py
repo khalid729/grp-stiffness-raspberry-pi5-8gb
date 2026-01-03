@@ -17,16 +17,18 @@ sio = socketio.AsyncServer(
 # Services - will be set from main.py
 data_service = None
 command_service = None
+plc_connector = None  # PLC connector for reconnection
 
 # Background task handle
 broadcast_task: Optional[asyncio.Task] = None
 
 
-def set_services(data_svc, cmd_svc):
+def set_services(data_svc, cmd_svc, plc=None):
     """Set service instances from main.py"""
-    global data_service, command_service
+    global data_service, command_service, plc_connector
     data_service = data_svc
     command_service = cmd_svc
+    plc_connector = plc
 
 
 @sio.event
@@ -101,8 +103,31 @@ async def set_jog_speed(sid, data):
 async def broadcast_live_data():
     """Background task to broadcast live data every 100ms"""
     logger.info("Starting live data broadcast task")
+    reconnect_interval = 0  # Counter for reconnection attempts
+    last_connected = False
+
     while True:
         try:
+            # Try to reconnect if disconnected (every 5 seconds)
+            if plc_connector and not plc_connector.connected:
+                reconnect_interval += 1
+                if reconnect_interval >= 50:  # 50 * 100ms = 5 seconds
+                    reconnect_interval = 0
+                    logger.info("Attempting to reconnect to PLC...")
+                    if plc_connector.connect():
+                        logger.info("Reconnected to PLC successfully!")
+                        await emit_connection_status(True)
+                        last_connected = True
+                    else:
+                        if last_connected:
+                            await emit_connection_status(False)
+                            last_connected = False
+            else:
+                reconnect_interval = 0
+                if plc_connector and plc_connector.connected and not last_connected:
+                    last_connected = True
+                    await emit_connection_status(True)
+
             if data_service:
                 data = data_service.get_live_data()
                 await sio.emit('live_data', data, room='live_data')

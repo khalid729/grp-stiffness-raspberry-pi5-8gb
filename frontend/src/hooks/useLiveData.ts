@@ -9,7 +9,7 @@ const defaultLiveData: LiveData = {
   ring_stiffness: 0,
   force_at_target: 0,
   sn_class: 0,
-  test_status: -1,
+  test_status: -1, // -1 = disconnected
   test_passed: false,
   servo_ready: false,
   servo_error: false,
@@ -20,10 +20,13 @@ const defaultLiveData: LiveData = {
   start_button: false,
   load_cell_raw: 0,
   actual_position: 0,
+  lock_upper: false,
+  lock_lower: false,
   remote_mode: false,
   connected: false,
 };
 
+// Real live data from WebSocket
 export function useLiveData() {
   const [liveData, setLiveData] = useState<LiveData>(defaultLiveData);
   const [isConnected, setIsConnected] = useState(false);
@@ -53,9 +56,31 @@ export function useLiveData() {
     };
   }, []);
 
-  return { liveData, isConnected };
+  const setRemoteMode = useCallback((mode: boolean) => {
+    setLiveData(prev => ({ ...prev, remote_mode: mode }));
+  }, []);
+
+  return { liveData, isConnected, setRemoteMode };
 }
 
+// Jog control via WebSocket for real-time response
+export function useJogControl() {
+  const jogForward = useCallback((pressed: boolean) => {
+    socketClient.jogForward(pressed);
+  }, []);
+
+  const jogBackward = useCallback((pressed: boolean) => {
+    socketClient.jogBackward(pressed);
+  }, []);
+
+  const setJogSpeed = useCallback((speed: number) => {
+    socketClient.setJogSpeed(speed);
+  }, []);
+
+  return { jogForward, jogBackward, setJogSpeed };
+}
+
+// Test status helper
 export function useTestStatus() {
   const { liveData, isConnected } = useLiveData();
 
@@ -70,27 +95,10 @@ export function useTestStatus() {
   };
 
   return {
-    status: liveData.test_status,
-    statusText: statusMap[liveData.test_status] || 'error',
+    status: statusMap[liveData.test_status] || 'unknown',
+    statusCode: liveData.test_status,
     isConnected,
-    isTesting: liveData.test_status === 2,
-    isIdle: liveData.test_status === 0,
+    isRunning: liveData.test_status === 2,
     isComplete: liveData.test_status === 5,
   };
-}
-
-export function useJogControl() {
-  const jogForward = useCallback((state: boolean) => {
-    socketClient.jogForward(state);
-  }, []);
-
-  const jogBackward = useCallback((state: boolean) => {
-    socketClient.jogBackward(state);
-  }, []);
-
-  const setJogSpeed = useCallback((velocity: number) => {
-    socketClient.setJogSpeed(velocity);
-  }, []);
-
-  return { jogForward, jogBackward, setJogSpeed };
 }

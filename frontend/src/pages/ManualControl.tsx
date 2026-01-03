@@ -1,8 +1,11 @@
-import { useTranslation } from 'react-i18next';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { ModeSelector } from '@/components/ModeSelector';
+import { StatusCard } from '@/components/dashboard/StatusCard';
+import { MachineIndicator } from '@/components/dashboard/MachineIndicator';
+import { TouchButton } from '@/components/ui/TouchButton';
+import { EStopButton } from '@/components/ui/EStopButton';
 import {
   ChevronUp,
   ChevronDown,
@@ -15,20 +18,64 @@ import {
   Move,
   Target
 } from 'lucide-react';
-import { StatusCard } from '@/components/dashboard/StatusCard';
-import { MachineIndicator } from '@/components/dashboard/MachineIndicator';
 import { useLiveData, useJogControl } from '@/hooks/useLiveData';
-import { useServoControl, useClampControl } from '@/hooks/useApi';
+import { useServoControl, useClampControl, useModeControl } from '@/hooks/useApi';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
 
 const ManualControl = () => {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { liveData, isConnected } = useLiveData();
   const { jogForward, jogBackward, setJogSpeed } = useJogControl();
   const { enableServo, disableServo, resetAlarm } = useServoControl();
   const { lockUpper, lockLower, unlockAll } = useClampControl();
+  const { setMode } = useModeControl();
 
-  const [jogSpeed, setJogSpeedLocal] = useState(50);
+  const [jogSpeedLocal, setJogSpeedLocal] = useState(50);
   const [isJogging, setIsJogging] = useState<'up' | 'down' | null>(null);
+
+  // Track active jog state to prevent rapid on/off toggling
+  const jogUpActive = useRef(false);
+  const jogDownActive = useRef(false);
+
+  // Global pointer release handler - catches release anywhere on screen
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (jogUpActive.current) {
+        jogUpActive.current = false;
+        setIsJogging(null);
+        jogBackward(false);
+      }
+      if (jogDownActive.current) {
+        jogDownActive.current = false;
+        setIsJogging(null);
+        jogForward(false);
+      }
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+    window.addEventListener('touchend', handleGlobalPointerUp);
+    window.addEventListener('touchcancel', handleGlobalPointerUp);
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+      window.removeEventListener('touchend', handleGlobalPointerUp);
+      window.removeEventListener('touchcancel', handleGlobalPointerUp);
+    };
+  }, [jogForward, jogBackward]);
+
+  // Mode control
+  const isLocalMode = !liveData.remote_mode;
+  const controlsDisabled = isLocalMode || !isConnected;
+  const isTestRunning = liveData.test_status === 2;
+  const isMoving = isJogging !== null;
+
+  // Call real API to change mode in PLC
+  const handleModeChange = (remoteMode: boolean) => {
+    setMode.mutate(remoteMode);
+  };
 
   // Handle jog speed change
   const handleJogSpeedChange = useCallback((value: number[]) => {
@@ -37,56 +84,75 @@ const ManualControl = () => {
     setJogSpeed(speed);
   }, [setJogSpeed]);
 
-  // Jog Up (backward)
-  const handleJogUp = useCallback((pressed: boolean) => {
-    setIsJogging(pressed ? 'up' : null);
-    jogBackward(pressed);
-  }, [jogBackward]);
+  // Jog Up (backward) - simple start, global handler will stop
+  const handleJogUpStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (controlsDisabled || jogUpActive.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    jogUpActive.current = true;
+    setIsJogging('up');
+    jogBackward(true);
+  }, [jogBackward, controlsDisabled]);
 
-  // Jog Down (forward)
-  const handleJogDown = useCallback((pressed: boolean) => {
-    setIsJogging(pressed ? 'down' : null);
-    jogForward(pressed);
-  }, [jogForward]);
+  // Jog Down (forward) - simple start, global handler will stop
+  const handleJogDownStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (controlsDisabled || jogDownActive.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    jogDownActive.current = true;
+    setIsJogging('down');
+    jogForward(true);
+  }, [jogForward, controlsDisabled]);
 
   // Clamp controls
   const handleLockUpper = () => {
-    lockUpper.mutate();
+    if (!controlsDisabled) lockUpper.mutate();
   };
 
   const handleLockLower = () => {
-    lockLower.mutate();
+    if (!controlsDisabled) lockLower.mutate();
   };
 
   const handleUnlockAll = () => {
-    unlockAll.mutate();
+    if (!controlsDisabled) unlockAll.mutate();
   };
 
   // Servo controls
   const handleServoEnable = () => {
-    enableServo.mutate();
+    if (!controlsDisabled) enableServo.mutate();
   };
 
   const handleServoDisable = () => {
-    disableServo.mutate();
+    if (!controlsDisabled) disableServo.mutate();
   };
 
   const handleResetAlarm = () => {
-    resetAlarm.mutate();
+    if (!controlsDisabled) resetAlarm.mutate();
   };
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col space-y-4 p-1 min-h-0">
-      {/* Page Title */}
-      <div className="flex-shrink-0 flex items-center gap-3">
-        <h1 className="text-xl lg:text-2xl font-bold">{t('manual.title')}</h1>
-        {!isConnected && (
-          <span className="text-xs text-destructive animate-pulse">PLC Disconnected</span>
-        )}
+    <div className="flex flex-col gap-4 md:gap-6 animate-slide-up">
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl lg:text-2xl font-bold">{t('manual.title')}</h1>
+          {!isConnected && (
+            <span className="connection-bar disconnected">
+              <span className="w-2 h-2 rounded-full bg-current" />
+              {t('connection.disconnected')}
+            </span>
+          )}
+        </div>
+
+        {/* E-Stop Always Available - Circular Industrial Style */}
+        <EStopButton 
+          size="lg"
+          label={t('actions.eStop')}
+        />
       </div>
 
       {/* Live Values Row */}
-      <div className="grid grid-cols-3 gap-3 flex-shrink-0">
+      <div className="grid grid-cols-3 gap-3">
         <StatusCard
           title={t('dashboard.force')}
           value={liveData.actual_force.toFixed(2)}
@@ -109,8 +175,17 @@ const ManualControl = () => {
         />
       </div>
 
+      {/* Mode Selector - Full Variant */}
+      <ModeSelector
+        remoteMode={liveData.remote_mode}
+        onModeChange={handleModeChange}
+        isTestRunning={isTestRunning}
+        isMoving={isMoving}
+        variant="full"
+      />
+
       {/* Control Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1">
+      <div className="control-grid">
         {/* Jog Control */}
         <Card className="industrial-card">
           <CardHeader className="pb-3">
@@ -118,59 +193,51 @@ const ManualControl = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Jog Up Button */}
-            <Button
-              variant="outline"
-              className={`w-full h-20 text-lg gap-2 transition-all ${
-                isJogging === 'up'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-primary/10'
-              }`}
-              onMouseDown={() => handleJogUp(true)}
-              onMouseUp={() => handleJogUp(false)}
-              onMouseLeave={() => handleJogUp(false)}
-              onTouchStart={() => handleJogUp(true)}
-              onTouchEnd={() => handleJogUp(false)}
-              disabled={!isConnected || !liveData.servo_ready}
+            <button
+              onPointerDown={handleJogUpStart}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={controlsDisabled || !liveData.servo_ready}
+              style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+              className={cn(
+                'jog-button w-full flex flex-col items-center justify-center gap-2',
+                isJogging === 'up' && 'active'
+              )}
             >
-              <ChevronUp className="w-8 h-8" />
-              {t('manual.jogUp')}
-            </Button>
+              <ChevronUp className="w-10 h-10 pointer-events-none" />
+              <span className="pointer-events-none">{t('manual.jogUp')}</span>
+            </button>
 
             {/* Speed Slider */}
-            <div className="space-y-2">
+            <div className="space-y-3 py-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t('manual.speed')}</span>
-                <span className="font-medium">{jogSpeed} mm/min</span>
+                <span className="text-muted-foreground font-medium">{t('manual.speed')}</span>
+                <span className="font-mono font-bold text-foreground">{jogSpeedLocal} mm/min</span>
               </div>
               <Slider
-                value={[jogSpeed]}
+                value={[jogSpeedLocal]}
                 onValueChange={handleJogSpeedChange}
                 min={1}
                 max={100}
                 step={1}
-                className="w-full"
-                disabled={!isConnected}
+                className="touch-slider"
+                disabled={controlsDisabled}
               />
             </div>
 
             {/* Jog Down Button */}
-            <Button
-              variant="outline"
-              className={`w-full h-20 text-lg gap-2 transition-all ${
-                isJogging === 'down'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-primary/10'
-              }`}
-              onMouseDown={() => handleJogDown(true)}
-              onMouseUp={() => handleJogDown(false)}
-              onMouseLeave={() => handleJogDown(false)}
-              onTouchStart={() => handleJogDown(true)}
-              onTouchEnd={() => handleJogDown(false)}
-              disabled={!isConnected || !liveData.servo_ready}
+            <button
+              onPointerDown={handleJogDownStart}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={controlsDisabled || !liveData.servo_ready}
+              style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+              className={cn(
+                'jog-button w-full flex flex-col items-center justify-center gap-2',
+                isJogging === 'down' && 'active'
+              )}
             >
-              <ChevronDown className="w-8 h-8" />
-              {t('manual.jogDown')}
-            </Button>
+              <ChevronDown className="w-10 h-10 pointer-events-none" />
+              <span className="pointer-events-none">{t('manual.jogDown')}</span>
+            </button>
           </CardContent>
         </Card>
 
@@ -180,33 +247,38 @@ const ManualControl = () => {
             <CardTitle className="text-base lg:text-lg">{t('manual.clampControl')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
+            <TouchButton
               onClick={handleLockUpper}
-              className="w-full h-14 text-base gap-2 bg-success hover:bg-success/90 text-success-foreground"
-              disabled={!isConnected || lockUpper.isPending}
+              variant="success"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || lockUpper.isPending}
             >
               <Lock className="w-5 h-5" />
               {t('manual.lockUpper')}
-            </Button>
+            </TouchButton>
 
-            <Button
+            <TouchButton
               onClick={handleLockLower}
-              className="w-full h-14 text-base gap-2 bg-success hover:bg-success/90 text-success-foreground"
-              disabled={!isConnected || lockLower.isPending}
+              variant="success"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || lockLower.isPending}
             >
               <Lock className="w-5 h-5" />
               {t('manual.lockLower')}
-            </Button>
+            </TouchButton>
 
-            <Button
-              variant="destructive"
+            <TouchButton
               onClick={handleUnlockAll}
-              className="w-full h-14 text-base gap-2"
-              disabled={!isConnected || unlockAll.isPending}
+              variant="destructive"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || unlockAll.isPending}
             >
               <Unlock className="w-5 h-5" />
               {t('manual.unlockAll')}
-            </Button>
+            </TouchButton>
 
             {/* Clamp Status */}
             <div className="pt-3 border-t border-border">
@@ -230,37 +302,41 @@ const ManualControl = () => {
             <CardTitle className="text-base lg:text-lg">{t('manual.servoControl')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
+            <TouchButton
               onClick={handleServoEnable}
-              className="w-full h-14 text-base gap-2 bg-success hover:bg-success/90 text-success-foreground"
-              disabled={!isConnected || enableServo.isPending}
+              variant="success"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || enableServo.isPending}
             >
               <Power className="w-5 h-5" />
               {t('manual.enable')}
-            </Button>
+            </TouchButton>
 
-            <Button
-              variant="outline"
+            <TouchButton
               onClick={handleServoDisable}
-              className="w-full h-14 text-base gap-2"
-              disabled={!isConnected || disableServo.isPending}
+              variant="outline"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || disableServo.isPending}
             >
               <PowerOff className="w-5 h-5" />
               {t('manual.disable')}
-            </Button>
+            </TouchButton>
 
-            <Button
-              variant="secondary"
+            <TouchButton
               onClick={handleResetAlarm}
-              className="w-full h-14 text-base gap-2"
-              disabled={!isConnected || resetAlarm.isPending}
+              variant="warning"
+              size="lg"
+              className="w-full gap-2"
+              disabled={controlsDisabled || resetAlarm.isPending}
             >
               <RotateCcw className="w-5 h-5" />
               {t('manual.resetAlarm')}
-            </Button>
+            </TouchButton>
 
             {/* Servo Status */}
-            <div className="pt-3 border-t border-border">
+            <div className="pt-3 border-t border-border space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <MachineIndicator
                   label={t('dashboard.servoReady')}
@@ -272,12 +348,10 @@ const ManualControl = () => {
                   isError={liveData.servo_error}
                 />
               </div>
-              <div className="mt-2">
-                <MachineIndicator
-                  label={t('dashboard.atHome')}
-                  isActive={liveData.at_home}
-                />
-              </div>
+              <MachineIndicator
+                label={t('dashboard.atHome')}
+                isActive={liveData.at_home}
+              />
             </div>
           </CardContent>
         </Card>

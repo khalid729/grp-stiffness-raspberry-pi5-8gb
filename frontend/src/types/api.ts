@@ -17,6 +17,8 @@ export interface LiveData {
   start_button: boolean;
   load_cell_raw: number;
   actual_position: number;
+  lock_upper: boolean;
+  lock_lower: boolean;
   remote_mode: boolean;
   connected: boolean;
 }

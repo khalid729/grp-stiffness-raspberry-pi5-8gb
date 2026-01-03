@@ -103,7 +103,7 @@ app.add_middleware(
 status.set_services(plc, data_service)
 commands.set_services(command_service)
 reports.set_services(pdf_generator, excel_exporter)
-ws.set_services(data_service, command_service)
+ws.set_services(data_service, command_service, plc)
 
 # Include routers
 app.include_router(status.router, prefix="/api")

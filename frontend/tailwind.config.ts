@@ -7,23 +7,17 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1rem",
       screens: {
         "2xl": "1400px",
       },
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        arabic: ['Cairo', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
-        brand: {
-          blue: "hsl(var(--brand-blue))",
-          teal: "hsl(var(--brand-teal))",
-          "blue-light": "hsl(var(--brand-blue-light))",
-        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -71,21 +65,13 @@ export default {
         },
         emergency: {
           DEFAULT: "hsl(var(--emergency))",
-          glow: "hsl(var(--emergency-glow))",
+          foreground: "hsl(var(--emergency-foreground))",
         },
-        status: {
-          idle: "hsl(var(--status-idle))",
-          starting: "hsl(var(--status-starting))",
-          testing: "hsl(var(--status-testing))",
-          target: "hsl(var(--status-target))",
-          returning: "hsl(var(--status-returning))",
-          complete: "hsl(var(--status-complete))",
-          error: "hsl(var(--status-error))",
-        },
-        indicator: {
-          on: "hsl(var(--indicator-on))",
-          off: "hsl(var(--indicator-off))",
-          error: "hsl(var(--indicator-error))",
+        mode: {
+          local: "hsl(var(--mode-local))",
+          "local-foreground": "hsl(var(--mode-local-foreground))",
+          remote: "hsl(var(--mode-remote))",
+          "remote-foreground": "hsl(var(--mode-remote-foreground))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -119,20 +105,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "pulse-slow": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.5" },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.8", transform: "scale(1.02)" },
         },
-        "blink": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.3" },
+        "slide-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "pulse-slow": "pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "blink": "blink 0.5s ease-in-out infinite",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "slide-up": "slide-up 0.3s ease-out",
       },
     },
   },

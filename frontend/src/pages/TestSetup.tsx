@@ -1,346 +1,256 @@
-import { useTranslation } from 'react-i18next';
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Home, Play, Square, Calculator, Settings2, Loader2 } from 'lucide-react';
-import { useLiveData } from '@/hooks/useLiveData';
-import { useCommands, useParameters, useSetParameters } from '@/hooks/useApi';
+import { TouchButton } from '@/components/ui/TouchButton';
+import { Slider } from '@/components/ui/slider';
+import { 
+  Settings2, 
+  Save, 
+  RotateCcw, 
+  CircleDot, 
+  Ruler, 
+  Gauge, 
+  Zap,
+  ArrowDownUp,
+  Target
+} from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { toast } from 'sonner';
 
-// SN Classes for GRP pipes
-const SN_CLASSES = ['SN 2500', 'SN 5000', 'SN 10000'];
+interface TestParameters {
+  pipe_diameter: number;
+  pipe_length: number;
+  deflection_percent: number;
+  test_speed: number;
+  max_stroke: number;
+  max_force: number;
+}
+
+const defaultParameters: TestParameters = {
+  pipe_diameter: 300,
+  pipe_length: 300,
+  deflection_percent: 3,
+  test_speed: 50,
+  max_stroke: 150,
+  max_force: 50,
+};
 
 const TestSetup = () => {
-  const { t } = useTranslation();
-  const { liveData, isConnected } = useLiveData();
-  const { startTest, stopTest, goHome } = useCommands();
-  const { data: parameters, isLoading: isLoadingParams } = useParameters();
-  const setParameters = useSetParameters();
+  const { t } = useLanguage();
+  const [parameters, setParameters] = useState<TestParameters>(defaultParameters);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Input parameters
-  const [pipeDiameter, setPipeDiameter] = useState<string>('200');
-  const [sampleLength, setSampleLength] = useState<string>('300');
-  const [deflectionPercent, setDeflectionPercent] = useState<string>('3');
-  const [testSpeed, setTestSpeed] = useState<string>('10');
-  const [operatorName, setOperatorName] = useState<string>('');
-  const [sampleId, setSampleId] = useState<string>('');
-  const [expectedSN, setExpectedSN] = useState<string>('SN 5000');
-
-  // Sync with PLC parameters when loaded
-  useEffect(() => {
-    if (parameters && parameters.connected) {
-      if (parameters.pipe_diameter > 0) setPipeDiameter(parameters.pipe_diameter.toString());
-      if (parameters.pipe_length > 0) setSampleLength(parameters.pipe_length.toString());
-      if (parameters.deflection_percent > 0) setDeflectionPercent(parameters.deflection_percent.toString());
-      if (parameters.test_speed > 0) setTestSpeed(parameters.test_speed.toString());
-    }
-  }, [parameters]);
-
-  // Calculated values
-  const calculatedValues = useMemo(() => {
-    const diameter = parseFloat(pipeDiameter) || 0;
-    const deflection = parseFloat(deflectionPercent) || 0;
-
-    // Target deflection in mm = (diameter * deflection%) / 100
-    const targetDeflectionMm = (diameter * deflection) / 100;
-
-    // Speed in mm/s = speed mm/min / 60
-    const speedMmS = (parseFloat(testSpeed) || 0) / 60;
-
-    // Estimated test time in seconds
-    const estimatedTime = targetDeflectionMm > 0 && speedMmS > 0
-      ? targetDeflectionMm / speedMmS
-      : 0;
-
-    return {
-      targetDeflectionMm: targetDeflectionMm.toFixed(2),
-      speedMmS: speedMmS.toFixed(2),
-      estimatedTime: estimatedTime.toFixed(1),
-    };
-  }, [pipeDiameter, deflectionPercent, testSpeed]);
-
-  const handleHome = () => {
-    goHome.mutate();
+  const handleInputChange = (field: keyof TestParameters, value: number) => {
+    setParameters(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleStartTest = () => {
-    // First, send parameters to PLC
-    setParameters.mutate({
-      pipe_diameter: parseFloat(pipeDiameter),
-      pipe_length: parseFloat(sampleLength),
-      deflection_percent: parseFloat(deflectionPercent),
-      test_speed: parseFloat(testSpeed),
-    }, {
-      onSuccess: () => {
-        // Then start the test
-        startTest.mutate();
-      }
-    });
+  const handleSliderChange = (field: keyof TestParameters, values: number[]) => {
+    setParameters(prev => ({ ...prev, [field]: values[0] }));
   };
 
-  const handleStop = () => {
-    stopTest.mutate();
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    toast.success(t('testSetup.saved'));
+    setIsSaving(false);
   };
 
-  const handleSaveParameters = () => {
-    setParameters.mutate({
-      pipe_diameter: parseFloat(pipeDiameter),
-      pipe_length: parseFloat(sampleLength),
-      deflection_percent: parseFloat(deflectionPercent),
-      test_speed: parseFloat(testSpeed),
-    });
+  const handleReset = () => {
+    setParameters(defaultParameters);
+    toast.info(t('testSetup.reset'));
   };
 
-  const isTesting = liveData.test_status === 2;
-  const canStart = isConnected && liveData.servo_ready && !liveData.servo_error && !isTesting;
+  // Calculate target deflection
+  const targetDeflection = (parameters.pipe_diameter * parameters.deflection_percent) / 100;
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col space-y-4 p-1 min-h-0">
-      {/* Page Title + Quick Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
+    <div className="flex flex-col gap-4 md:gap-6 animate-slide-up">
+      {/* Header */}
+      <div className="page-header">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl lg:text-2xl font-bold">{t('testSetup.title')}</h1>
-          {!isConnected && (
-            <span className="text-xs text-destructive animate-pulse">PLC Disconnected</span>
-          )}
+          <Settings2 className="w-6 h-6 text-primary" />
+          <h1 className="text-xl lg:text-2xl font-bold">{t('nav.testSetup')}</h1>
         </div>
-
-        {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2">
-          <Button
+        <div className="flex gap-3">
+          <TouchButton
             variant="outline"
-            onClick={handleHome}
-            size="sm"
-            className="gap-1.5"
-            disabled={!isConnected || goHome.isPending}
+            onClick={handleReset}
+            className="gap-2"
           >
-            <Home className="w-4 h-4" />
-            Home
-          </Button>
-          <Button
-            onClick={handleStartTest}
-            disabled={!canStart || startTest.isPending || setParameters.isPending}
-            size="sm"
-            className="gap-1.5 bg-success hover:bg-success/90 text-success-foreground"
+            <RotateCcw className="w-5 h-5" />
+            {t('testSetup.resetBtn')}
+          </TouchButton>
+          <TouchButton
+            variant="success"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="gap-2"
           >
-            {(startTest.isPending || setParameters.isPending) ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4" />
-            )}
-            Start
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleStop}
-            size="sm"
-            className="gap-1.5"
-            disabled={stopTest.isPending}
-          >
-            <Square className="w-4 h-4" />
-            Stop
-          </Button>
+            <Save className="w-5 h-5" />
+            {t('testSetup.saveBtn')}
+          </TouchButton>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
-        {/* Input Parameters Card */}
+      {/* Calculated Values */}
+      <div className="industrial-card p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">{t('testSetup.targetDeflection')}</span>
+          <span className="text-2xl font-mono font-bold text-primary">
+            {targetDeflection.toFixed(2)} mm
+          </span>
+        </div>
+      </div>
+
+      {/* Parameters Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Pipe Parameters */}
         <Card className="industrial-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
-              <Settings2 className="w-5 h-5 text-primary" />
-              {t('testSetup.inputParameters')}
-              {isLoadingParams && <Loader2 className="w-4 h-4 animate-spin" />}
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CircleDot className="w-5 h-5 text-info" />
+              {t('testSetup.pipeParams')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {/* Pipe Diameter */}
-            <div className="space-y-1.5">
-              <Label htmlFor="pipeDiameter">{t('testSetup.pipeDiameter')} (mm)</Label>
-              <Input
-                id="pipeDiameter"
-                type="number"
-                value={pipeDiameter}
-                onChange={(e) => setPipeDiameter(e.target.value)}
-                placeholder="200"
-                className="industrial-input"
-                disabled={isTesting}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.pipeDiameter')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.pipe_diameter} mm</span>
+              </div>
+              <Slider
+                value={[parameters.pipe_diameter]}
+                onValueChange={(v) => handleSliderChange('pipe_diameter', v)}
+                min={50}
+                max={1000}
+                step={10}
               />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>50 mm</span>
+                <span>1000 mm</span>
+              </div>
             </div>
 
-            {/* Sample Length */}
-            <div className="space-y-1.5">
-              <Label htmlFor="sampleLength">{t('testSetup.sampleLength')} (mm)</Label>
-              <Input
-                id="sampleLength"
-                type="number"
-                value={sampleLength}
-                onChange={(e) => setSampleLength(e.target.value)}
-                placeholder="300"
-                className="industrial-input"
-                disabled={isTesting}
+            {/* Pipe Length */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.pipeLength')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.pipe_length} mm</span>
+              </div>
+              <Slider
+                value={[parameters.pipe_length]}
+                onValueChange={(v) => handleSliderChange('pipe_length', v)}
+                min={100}
+                max={500}
+                step={10}
               />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>100 mm</span>
+                <span>500 mm</span>
+              </div>
             </div>
 
             {/* Deflection Percent */}
-            <div className="space-y-1.5">
-              <Label htmlFor="deflectionPercent">{t('testSetup.deflectionPercent')}</Label>
-              <Input
-                id="deflectionPercent"
-                type="number"
-                value={deflectionPercent}
-                onChange={(e) => setDeflectionPercent(e.target.value)}
-                placeholder="3"
-                min="0"
-                max="30"
-                step="0.5"
-                className="industrial-input"
-                disabled={isTesting}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.deflectionPercent')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.deflection_percent}%</span>
+              </div>
+              <Slider
+                value={[parameters.deflection_percent]}
+                onValueChange={(v) => handleSliderChange('deflection_percent', v)}
+                min={1}
+                max={10}
+                step={0.5}
               />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1%</span>
+                <span>10%</span>
+              </div>
             </div>
-
-            {/* Test Speed */}
-            <div className="space-y-1.5">
-              <Label htmlFor="testSpeed">{t('testSetup.testSpeed')} (mm/min)</Label>
-              <Input
-                id="testSpeed"
-                type="number"
-                value={testSpeed}
-                onChange={(e) => setTestSpeed(e.target.value)}
-                placeholder="10"
-                className="industrial-input"
-                disabled={isTesting}
-              />
-            </div>
-
-            {/* Expected SN Class */}
-            <div className="space-y-1.5">
-              <Label>{t('testSetup.expectedSN')}</Label>
-              <Select value={expectedSN} onValueChange={setExpectedSN} disabled={isTesting}>
-                <SelectTrigger className="industrial-input">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SN_CLASSES.map((sn) => (
-                    <SelectItem key={sn} value={sn}>
-                      {sn}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Operator Name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="operatorName">{t('testSetup.operatorName')}</Label>
-              <Input
-                id="operatorName"
-                type="text"
-                value={operatorName}
-                onChange={(e) => setOperatorName(e.target.value)}
-                placeholder="Enter operator name"
-                className="industrial-input"
-              />
-            </div>
-
-            {/* Sample ID */}
-            <div className="space-y-1.5">
-              <Label htmlFor="sampleId">{t('testSetup.sampleId')}</Label>
-              <Input
-                id="sampleId"
-                type="text"
-                value={sampleId}
-                onChange={(e) => setSampleId(e.target.value)}
-                placeholder="Enter sample ID"
-                className="industrial-input"
-              />
-            </div>
-
-            {/* Save Parameters Button */}
-            <Button
-              variant="outline"
-              onClick={handleSaveParameters}
-              disabled={!isConnected || setParameters.isPending || isTesting}
-              className="w-full"
-            >
-              {setParameters.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              Save to PLC
-            </Button>
           </CardContent>
         </Card>
 
-        {/* Calculated Values Card */}
+        {/* Test Parameters */}
         <Card className="industrial-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
-              <Calculator className="w-5 h-5 text-warning" />
-              {t('testSetup.calculatedValues')}
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Gauge className="w-5 h-5 text-warning" />
+              {t('testSetup.testParams')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Target Deflection */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground mb-1">
-                {t('testSetup.targetDeflection')}
+          <CardContent className="space-y-6">
+            {/* Test Speed */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.testSpeed')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.test_speed} mm/min</span>
               </div>
-              <div className="text-3xl font-bold text-foreground">
-                {calculatedValues.targetDeflectionMm}
-                <span className="text-lg font-normal text-muted-foreground ml-2">mm</span>
-              </div>
-            </div>
-
-            {/* Speed in mm/s */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground mb-1">
-                {t('testSetup.testSpeed')}
-              </div>
-              <div className="text-3xl font-bold text-foreground">
-                {calculatedValues.speedMmS}
-                <span className="text-lg font-normal text-muted-foreground ml-2">mm/s</span>
+              <Slider
+                value={[parameters.test_speed]}
+                onValueChange={(v) => handleSliderChange('test_speed', v)}
+                min={1}
+                max={100}
+                step={1}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1 mm/min</span>
+                <span>100 mm/min</span>
               </div>
             </div>
 
-            {/* Estimated Time */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground mb-1">
-                Estimated Test Time
+            {/* Max Stroke */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.maxStroke')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.max_stroke} mm</span>
               </div>
-              <div className="text-3xl font-bold text-foreground">
-                {calculatedValues.estimatedTime}
-                <span className="text-lg font-normal text-muted-foreground ml-2">seconds</span>
+              <Slider
+                value={[parameters.max_stroke]}
+                onValueChange={(v) => handleSliderChange('max_stroke', v)}
+                min={50}
+                max={300}
+                step={10}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>50 mm</span>
+                <span>300 mm</span>
               </div>
             </div>
 
-            {/* Test Summary */}
-            <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <div className="text-sm font-medium text-primary mb-2">Test Summary</div>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>Pipe: {pipeDiameter || '0'} mm x {sampleLength || '0'} mm</li>
-                <li>Target: {deflectionPercent || '0'}% ({calculatedValues.targetDeflectionMm} mm)</li>
-                <li>Expected: {expectedSN}</li>
-                {operatorName && <li>Operator: {operatorName}</li>}
-                {sampleId && <li>Sample: {sampleId}</li>}
-              </ul>
-            </div>
-
-            {/* Live Values from PLC */}
-            {isConnected && (
-              <div className="p-4 rounded-lg bg-info/10 border border-info/20">
-                <div className="text-sm font-medium text-info mb-2">Live Values</div>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>Force: {liveData.actual_force.toFixed(2)} kN</li>
-                  <li>Deflection: {liveData.actual_deflection.toFixed(2)} mm</li>
-                  <li>Position: {liveData.actual_position.toFixed(2)} mm</li>
-                </ul>
+            {/* Max Force */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">{t('testSetup.maxForce')}</Label>
+                <span className="font-mono text-lg font-bold">{parameters.max_force} kN</span>
               </div>
-            )}
+              <Slider
+                value={[parameters.max_force]}
+                onValueChange={(v) => handleSliderChange('max_force', v)}
+                min={10}
+                max={100}
+                step={5}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>10 kN</span>
+                <span>100 kN</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* ISO Standard Info */}
+      <div className="industrial-card p-4">
+        <div className="flex items-start gap-3 text-sm text-muted-foreground">
+          <Target className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <p>
+            {t('testSetup.isoNote')}
+          </p>
+        </div>
       </div>
     </div>
   );

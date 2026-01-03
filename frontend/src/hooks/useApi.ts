@@ -1,45 +1,34 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/api/client';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { TestParameters, TestsResponse, AlarmsResponse } from '@/types/api';
+import type { CommandResponse, ModeResponse } from '@/types/api';
 
-// ========== Parameters ==========
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-export function useParameters() {
-  return useQuery({
-    queryKey: ['parameters'],
-    queryFn: () => api.getParameters(),
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
-}
-
-export function useSetParameters() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: Partial<TestParameters>) => api.setParameters(params),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success('Parameters updated');
-        queryClient.invalidateQueries({ queryKey: ['parameters'] });
-      } else {
-        toast.error(data.message);
-      }
-    },
-    onError: (error) => {
-      toast.error(`Failed to update parameters: ${error.message}`);
+// Real API call helper
+const apiCall = async (endpoint: string, options?: RequestInit): Promise<CommandResponse> => {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
     },
   });
-}
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+};
 
 // ========== Commands ==========
 
 export function useCommands() {
   const startTest = useMutation({
-    mutationFn: () => api.startTest(),
+    mutationFn: () => apiCall('/api/command/start', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success('Test started');
+        toast.success(data.message);
       } else {
         toast.error(data.message);
       }
@@ -50,30 +39,30 @@ export function useCommands() {
   });
 
   const stopTest = useMutation({
-    mutationFn: () => api.stopTest(),
+    mutationFn: () => apiCall('/api/command/stop', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.warning('Test stopped');
+        toast.warning(data.message);
       } else {
         toast.error(data.message);
       }
     },
     onError: (error) => {
-      toast.error(`Failed to stop: ${error.message}`);
+      toast.error(`Failed to stop test: ${error.message}`);
     },
   });
 
   const goHome = useMutation({
-    mutationFn: () => api.goHome(),
+    mutationFn: () => apiCall('/api/command/home', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.info('Moving to home position...');
+        toast.info(data.message);
       } else {
         toast.error(data.message);
       }
     },
     onError: (error) => {
-      toast.error(`Failed to home: ${error.message}`);
+      toast.error(`Failed to go home: ${error.message}`);
     },
   });
 
@@ -84,35 +73,44 @@ export function useCommands() {
 
 export function useServoControl() {
   const enableServo = useMutation({
-    mutationFn: () => api.enableServo(),
+    mutationFn: () => apiCall('/api/servo/enable', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success('Servo enabled');
+        toast.success(data.message);
       } else {
         toast.error(data.message);
       }
+    },
+    onError: (error) => {
+      toast.error(`Failed to enable servo: ${error.message}`);
     },
   });
 
   const disableServo = useMutation({
-    mutationFn: () => api.disableServo(),
+    mutationFn: () => apiCall('/api/servo/disable', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.warning('Servo disabled');
+        toast.warning(data.message);
       } else {
         toast.error(data.message);
       }
     },
+    onError: (error) => {
+      toast.error(`Failed to disable servo: ${error.message}`);
+    },
   });
 
   const resetAlarm = useMutation({
-    mutationFn: () => api.resetAlarm(),
+    mutationFn: () => apiCall('/api/servo/reset', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.info('Alarm reset');
+        toast.info(data.message);
       } else {
         toast.error(data.message);
       }
+    },
+    onError: (error) => {
+      toast.error(`Failed to reset alarm: ${error.message}`);
     },
   });
 
@@ -123,136 +121,108 @@ export function useServoControl() {
 
 export function useClampControl() {
   const lockUpper = useMutation({
-    mutationFn: () => api.lockUpper(),
+    mutationFn: () => apiCall('/api/clamp/upper/lock', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success('Upper clamp locked');
+        toast.success(data.message);
       } else {
         toast.error(data.message);
       }
+    },
+    onError: (error) => {
+      toast.error(`Failed to lock upper clamp: ${error.message}`);
     },
   });
 
   const lockLower = useMutation({
-    mutationFn: () => api.lockLower(),
+    mutationFn: () => apiCall('/api/clamp/lower/lock', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success('Lower clamp locked');
+        toast.success(data.message);
       } else {
         toast.error(data.message);
       }
     },
+    onError: (error) => {
+      toast.error(`Failed to lock lower clamp: ${error.message}`);
+    },
   });
 
   const unlockAll = useMutation({
-    mutationFn: () => api.unlockAll(),
+    mutationFn: () => apiCall('/api/clamp/unlock', { method: 'POST' }),
     onSuccess: (data) => {
       if (data.success) {
-        toast.warning('All clamps unlocked');
+        toast.warning(data.message);
       } else {
         toast.error(data.message);
       }
+    },
+    onError: (error) => {
+      toast.error(`Failed to unlock clamps: ${error.message}`);
     },
   });
 
   return { lockUpper, lockLower, unlockAll };
 }
 
-// ========== Tests ==========
+// ========== Mode Control ==========
 
-export function useTests(page = 1, pageSize = 20) {
-  return useQuery({
-    queryKey: ['tests', page, pageSize],
-    queryFn: () => api.getTests(page, pageSize),
-  });
-}
-
-export function useTest(id: number) {
-  return useQuery({
-    queryKey: ['test', id],
-    queryFn: () => api.getTest(id),
-    enabled: id > 0,
-  });
-}
-
-export function useDeleteTest() {
+export function useModeControl() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (id: number) => api.deleteTest(id),
+  const modeQuery = useQuery<ModeResponse>({
+    queryKey: ['mode'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/mode`);
+      if (!response.ok) throw new Error('Failed to fetch mode');
+      return response.json();
+    },
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  const setMode = useMutation({
+    mutationFn: async (remoteMode: boolean) => {
+      const endpoint = remoteMode ? '/api/mode/remote' : '/api/mode/local';
+      return apiCall(endpoint, { method: 'POST' });
+    },
     onSuccess: (data) => {
       if (data.success) {
-        toast.success('Test deleted');
-        queryClient.invalidateQueries({ queryKey: ['tests'] });
+        toast.success(data.message);
+        queryClient.invalidateQueries({ queryKey: ['mode'] });
       } else {
         toast.error(data.message);
       }
     },
-  });
-}
-
-// ========== Alarms ==========
-
-export function useAlarms(activeOnly = false, page = 1) {
-  return useQuery({
-    queryKey: ['alarms', activeOnly, page],
-    queryFn: () => api.getAlarms(activeOnly, page),
-    refetchInterval: 5000,
-  });
-}
-
-export function useAcknowledgeAlarm() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, ackBy }: { id: number; ackBy?: string }) =>
-      api.acknowledgeAlarm(id, ackBy),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success('Alarm acknowledged');
-        queryClient.invalidateQueries({ queryKey: ['alarms'] });
-      } else {
-        toast.error(data.message);
-      }
-    },
-  });
-}
-
-export function useAcknowledgeAllAlarms() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (ackBy?: string) => api.acknowledgeAllAlarms(ackBy),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success('All alarms acknowledged');
-        queryClient.invalidateQueries({ queryKey: ['alarms'] });
-      } else {
-        toast.error(data.message);
-      }
-    },
-  });
-}
-
-// ========== Connection ==========
-
-export function useConnection() {
-  const status = useQuery({
-    queryKey: ['connection'],
-    queryFn: () => api.getConnectionStatus(),
-    refetchInterval: 3000,
-  });
-
-  const reconnect = useMutation({
-    mutationFn: () => api.reconnect(),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success('Reconnected to PLC');
-      } else {
-        toast.error(data.message);
-      }
+    onError: (error) => {
+      toast.error(`Failed to change mode: ${error.message}`);
     },
   });
 
-  return { status, reconnect };
+  return {
+    setMode,
+    currentMode: modeQuery.data,
+    isLoading: modeQuery.isLoading,
+  };
+}
+
+// ========== Jog Control ==========
+
+export function useJogApi() {
+  const setJogSpeed = useMutation({
+    mutationFn: (velocity: number) =>
+      apiCall('/api/jog/speed', {
+        method: 'POST',
+        body: JSON.stringify({ velocity }),
+      }),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.info(data.message);
+      }
+    },
+    onError: (error) => {
+      toast.error(`Failed to set jog speed: ${error.message}`);
+    },
+  });
+
+  return { setJogSpeed };
 }

@@ -1,221 +1,223 @@
-import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  AlertTriangle,
+import { TouchButton } from '@/components/ui/TouchButton';
+import { 
+  AlertTriangle, 
+  Bell, 
+  BellOff, 
+  CheckCircle2, 
+  XCircle, 
   AlertCircle,
-  CheckCircle,
-  Bell,
-  BellOff,
-  History,
-  Loader2
+  Clock,
+  User,
+  RefreshCw,
+  Filter
 } from 'lucide-react';
-import { useAlarms, useAcknowledgeAlarm, useAcknowledgeAllAlarms } from '@/hooks/useApi';
-import { socketClient } from '@/api/socket';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
-import type { Alarm } from '@/types/api';
+import { cn } from '@/lib/utils';
 
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case 'critical':
-      return 'bg-destructive/20 text-destructive border-destructive/30';
-    case 'warning':
-      return 'bg-warning/20 text-warning border-warning/30';
-    case 'info':
-      return 'bg-info/20 text-info border-info/30';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-};
-
-const getSeverityIcon = (severity: string) => {
-  switch (severity) {
-    case 'critical':
-      return <AlertCircle className="w-5 h-5 text-destructive" />;
-    case 'warning':
-      return <AlertTriangle className="w-5 h-5 text-warning" />;
-    case 'info':
-      return <Bell className="w-5 h-5 text-info" />;
-    default:
-      return <Bell className="w-5 h-5" />;
-  }
-};
+interface Alarm {
+  id: number;
+  alarm_code: string;
+  message: string;
+  severity: 'critical' | 'warning' | 'info';
+  timestamp: string;
+  acknowledged: boolean;
+  ack_by: string | null;
+}
 
 const Alarms = () => {
-  const { t } = useTranslation();
-  const { data: alarmsData, isLoading, refetch } = useAlarms(false, 1);
-  const acknowledgeAlarm = useAcknowledgeAlarm();
-  const acknowledgeAllAlarms = useAcknowledgeAllAlarms();
+  const { t } = useLanguage();
+  const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [filter, setFilter] = useState<'all' | 'active' | 'acknowledged'>('all');
 
-  // Listen for new alarms via WebSocket
-  useEffect(() => {
-    const unsubscribe = socketClient.on<Alarm>('alarm', (alarm) => {
-      toast.error(`${alarm.alarm_code}: ${alarm.message}`, {
-        duration: 10000,
-      });
-      refetch();
-    });
-    return unsubscribe;
-  }, [refetch]);
-
-  const handleAcknowledge = (alarmId: number) => {
-    acknowledgeAlarm.mutate({ id: alarmId });
+  const handleAcknowledge = (id: number) => {
+    setAlarms(prev => 
+      prev.map(alarm => 
+        alarm.id === id 
+          ? { ...alarm, acknowledged: true, ack_by: 'Operator' }
+          : alarm
+      )
+    );
+    toast.success(t('alarms.acknowledged'));
   };
 
   const handleAcknowledgeAll = () => {
-    acknowledgeAllAlarms.mutate();
+    setAlarms(prev => 
+      prev.map(alarm => ({ ...alarm, acknowledged: true, ack_by: 'Operator' }))
+    );
+    toast.success(t('alarms.allAcknowledged'));
   };
 
-  const activeAlarms = alarmsData?.alarms.filter(a => !a.acknowledged) || [];
-  const acknowledgedAlarms = alarmsData?.alarms.filter(a => a.acknowledged) || [];
-  const unacknowledgedCount = activeAlarms.length;
+  const handleRefresh = () => {
+    toast.info(t('alarms.refreshed'));
+  };
+
+  const filteredAlarms = alarms.filter(alarm => {
+    if (filter === 'active') return !alarm.acknowledged;
+    if (filter === 'acknowledged') return alarm.acknowledged;
+    return true;
+  });
+
+  const activeCount = alarms.filter(a => !a.acknowledged).length;
+  const criticalCount = alarms.filter(a => a.severity === 'critical' && !a.acknowledged).length;
+
+  const getSeverityIcon = (severity: Alarm['severity']) => {
+    switch (severity) {
+      case 'critical':
+        return <XCircle className="w-5 h-5 text-destructive" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5 text-warning" />;
+      case 'info':
+        return <AlertCircle className="w-5 h-5 text-info" />;
+    }
+  };
+
+  const getSeverityStyle = (severity: Alarm['severity'], acknowledged: boolean) => {
+    if (acknowledged) return 'border-border bg-muted/30 opacity-70';
+    switch (severity) {
+      case 'critical':
+        return 'border-destructive/50 bg-destructive/10';
+      case 'warning':
+        return 'border-warning/50 bg-warning/10';
+      case 'info':
+        return 'border-info/50 bg-info/10';
+    }
+  };
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col space-y-4 p-1 min-h-0">
-      {/* Page Title */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
+    <div className="flex flex-col gap-4 md:gap-6 animate-slide-up">
+      {/* Header */}
+      <div className="page-header">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl lg:text-2xl font-bold">{t('alarms.title')}</h1>
-          {unacknowledgedCount > 0 && (
-            <Badge variant="destructive" className="animate-pulse">
-              {unacknowledgedCount} Active
-            </Badge>
+          <Bell className="w-6 h-6 text-warning" />
+          <h1 className="text-xl lg:text-2xl font-bold">{t('nav.alarms')}</h1>
+          {activeCount > 0 && (
+            <span className={cn(
+              'px-3 py-1 rounded-full text-sm font-bold',
+              criticalCount > 0 
+                ? 'bg-destructive text-destructive-foreground animate-pulse' 
+                : 'bg-warning text-warning-foreground'
+            )}>
+              {activeCount} {t('alarms.active')}
+            </span>
           )}
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          <Button
+        <div className="flex gap-3">
+          <TouchButton
             variant="outline"
+            onClick={handleRefresh}
+            className="gap-2"
+          >
+            <RefreshCw className="w-5 h-5" />
+            {t('alarms.refresh')}
+          </TouchButton>
+          <TouchButton
+            variant="warning"
             onClick={handleAcknowledgeAll}
-            size="sm"
-            className="gap-1.5"
-            disabled={unacknowledgedCount === 0 || acknowledgeAllAlarms.isPending}
+            disabled={activeCount === 0}
+            className="gap-2"
           >
-            {acknowledgeAllAlarms.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle className="w-4 h-4" />
-            )}
-            {t('alarms.acknowledge')} All
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => refetch()}
-            size="sm"
-            className="gap-1.5"
-          >
-            <BellOff className="w-4 h-4" />
-            Refresh
-          </Button>
+            <CheckCircle2 className="w-5 h-5" />
+            {t('alarms.ackAll')}
+          </TouchButton>
         </div>
       </div>
 
-      {/* Active Alarms */}
-      <Card className="industrial-card flex-shrink-0">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
-            {t('alarms.activeAlarms')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activeAlarms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <CheckCircle className="w-12 h-12 mb-3 text-success" />
-              <p className="text-lg font-medium">{t('alarms.noActiveAlarms')}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {activeAlarms.map((alarm) => (
-                <div
-                  key={alarm.id}
-                  className={`flex items-center justify-between p-4 rounded-lg border ${getSeverityColor(alarm.severity)}`}
-                >
-                  <div className="flex items-center gap-4">
+      {/* Filter Tabs */}
+      <div className="flex gap-2 p-1 bg-secondary rounded-xl">
+        {(['all', 'active', 'acknowledged'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={cn(
+              'flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all touch-none',
+              filter === f 
+                ? 'bg-primary text-primary-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t(`alarms.filter.${f}`)}
+            {f === 'active' && activeCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-warning/20 text-warning rounded-full text-xs">
+                {activeCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Alarms List */}
+      <div className="space-y-3">
+        {filteredAlarms.length === 0 ? (
+          <div className="industrial-card p-8 text-center">
+            <BellOff className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">{t('alarms.noAlarms')}</p>
+          </div>
+        ) : (
+          filteredAlarms.map(alarm => (
+            <Card 
+              key={alarm.id} 
+              className={cn(
+                'industrial-card border-2 transition-all',
+                getSeverityStyle(alarm.severity, alarm.acknowledged)
+              )}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start gap-4">
+                  {/* Severity Icon */}
+                  <div className="flex-shrink-0 mt-1">
                     {getSeverityIcon(alarm.severity)}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold">{alarm.alarm_code}</span>
-                        <span className="font-medium">{alarm.message}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(alarm.timestamp).toLocaleString()}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono font-bold text-sm bg-secondary px-2 py-0.5 rounded">
+                        {alarm.alarm_code}
                       </span>
+                      {alarm.acknowledged && (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {t('alarms.acked')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-medium text-foreground mb-2">
+                      {alarm.message}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {alarm.timestamp}
+                      </span>
+                      {alarm.ack_by && (
+                        <span className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          {alarm.ack_by}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleAcknowledge(alarm.id)}
-                    className="gap-1.5"
-                    disabled={acknowledgeAlarm.isPending}
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    {t('alarms.acknowledge')}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Alarm History */}
-      <Card className="industrial-card flex-1 min-h-0 flex flex-col">
-        <CardHeader className="pb-3 flex-shrink-0">
-          <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
-            <History className="w-5 h-5 text-muted-foreground" />
-            {t('alarms.alarmHistory')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-auto">
-          {acknowledgedAlarms.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">Code</TableHead>
-                  <TableHead>{t('alarms.alarm')}</TableHead>
-                  <TableHead>{t('alarms.time')}</TableHead>
-                  <TableHead>Severity</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {acknowledgedAlarms.map((alarm) => (
-                  <TableRow key={alarm.id}>
-                    <TableCell className="font-mono font-bold">{alarm.alarm_code}</TableCell>
-                    <TableCell>{alarm.message}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(alarm.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getSeverityColor(alarm.severity)}>
-                        {alarm.severity.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <History className="w-12 h-12 mb-3 opacity-50" />
-              <p className="text-lg font-medium">No alarm history</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  {/* Action */}
+                  {!alarm.acknowledged && (
+                    <TouchButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAcknowledge(alarm.id)}
+                      className="flex-shrink-0"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </TouchButton>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 };

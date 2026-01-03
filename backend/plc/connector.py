@@ -29,10 +29,23 @@ class PLCConnector:
     def connected(self) -> bool:
         """Check if PLC is connected"""
         try:
-            return self._connected and self.client.get_connected()
+            if not self._connected:
+                return False
+            # Actually test the connection
+            is_connected = self.client.get_connected()
+            if not is_connected:
+                self._connected = False
+            return is_connected
         except Exception:
             self._connected = False
             return False
+
+    def _handle_connection_error(self, error: Exception) -> None:
+        """Handle connection errors and mark as disconnected"""
+        error_str = str(error)
+        if "Socket error" in error_str or "TCP" in error_str or "connection" in error_str.lower():
+            self._connected = False
+            logger.warning(f"Connection lost: {error}")
 
     def connect(self) -> bool:
         """Establish connection to PLC"""
@@ -166,6 +179,7 @@ class PLCConnector:
                 data = self.client.read_area(Areas.PE, 0, byte_offset, 1)
                 return get_bool(data, 0, bit)
         except Exception as e:
+            self._handle_connection_error(e)
             logger.error(f"Error reading input I{byte_offset}.{bit}: {e}")
             return None
 
@@ -185,6 +199,7 @@ class PLCConnector:
                 data = self.client.read_area(Areas.PE, 0, byte_offset, 1)
                 return data[0]
         except Exception as e:
+            self._handle_connection_error(e)
             logger.error(f"Error reading input byte IB{byte_offset}: {e}")
             return None
 
@@ -204,5 +219,56 @@ class PLCConnector:
                 data = self.client.read_area(Areas.PE, 0, address, 2)
                 return get_int(data, 0)
         except Exception as e:
+            self._handle_connection_error(e)
             logger.error(f"Error reading analog input IW{address}: {e}")
+            return None
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DIRECT HARDWARE OUTPUTS - Write directly to physical outputs (PA/Q Area)
+    # ══════════════════════════════════════════════════════════════════════
+
+    def write_output_bit(self, byte_offset: int, bit: int, value: bool) -> bool:
+        """Write digital output directly to hardware (Q0.0, Q0.1, etc.)
+
+        Args:
+            byte_offset: Byte number (0 for Q0.x, 1 for Q1.x, 4 for Q4.x)
+            bit: Bit number (0-7)
+            value: True/False
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.connected:
+            return False
+        try:
+            with self.lock:
+                # Read current byte to preserve other bits
+                data = self.client.read_area(Areas.PA, 0, byte_offset, 1)
+                set_bool(data, 0, bit, value)
+                self.client.write_area(Areas.PA, 0, byte_offset, data)
+                return True
+        except Exception as e:
+            self._handle_connection_error(e)
+            logger.error(f"Error writing output Q{byte_offset}.{bit}: {e}")
+            return False
+
+    def read_output_bit(self, byte_offset: int, bit: int) -> Optional[bool]:
+        """Read digital output state (Q0.0, Q0.1, etc.)
+
+        Args:
+            byte_offset: Byte number (0 for Q0.x, 1 for Q1.x)
+            bit: Bit number (0-7)
+
+        Returns:
+            bool value or None if error
+        """
+        if not self.connected:
+            return None
+        try:
+            with self.lock:
+                data = self.client.read_area(Areas.PA, 0, byte_offset, 1)
+                return get_bool(data, 0, bit)
+        except Exception as e:
+            self._handle_connection_error(e)
+            logger.error(f"Error reading output Q{byte_offset}.{bit}: {e}")
             return None

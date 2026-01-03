@@ -87,52 +87,79 @@ DB2
 
 ### DB3 - Servo Control (Read/Write)
 
-#### Control Bits (Byte 0)
+#### Control Bits - Commands (Write)
 
-| Bit | Address | Name | Type | Description |
-|-----|---------|------|------|-------------|
-| 0 | DBX0.0 | enable | Latch | Servo motor enable |
-| 1 | DBX0.1 | jog_forward | Hold | Jog down (hold while moving) |
-| 2 | DBX0.2 | jog_backward | Hold | Jog up (hold while moving) |
-| 3 | DBX0.3 | start_test | Latch | Start automated test |
-| 4 | DBX0.4 | stop | Pulse | Emergency stop (pulse) |
-| 5 | DBX0.5 | home | Latch | Go to home position |
-| 6 | DBX0.6 | alarm_reset | Pulse | Reset servo alarm (pulse) |
+| Byte | Bit | Address | Name | Type | Description |
+|------|-----|---------|------|------|-------------|
+| 0 | 0 | DBX0.0 | Enable | Latch | Servo motor enable |
+| 0 | 1 | DBX0.1 | Jog_Forward | Hold | Jog down (hold while moving) |
+| 0 | 2 | DBX0.2 | Jog_Backward | Hold | Jog up (hold while moving) |
+| 0 | 3 | DBX0.3 | Start_Test | Latch | Start automated test |
+| 0 | 4 | DBX0.4 | Stop | Pulse | Emergency stop (pulse) |
+| 0 | 5 | DBX0.5 | Reset | Pulse | Reset servo alarm (pulse) |
+| 0 | 6 | DBX0.6 | Home | Latch | Go to home position |
+| 14 | 0 | DBX14.0 | Lock_Upper | Latch | Lock upper clamp |
+| 14 | 1 | DBX14.1 | Lock_Lower | Latch | Lock lower clamp |
+| 25 | 0 | DBX25.0 | Remote_Mode | Latch | Enable remote control mode |
 
-#### Status Bits (Byte 1)
+#### Status Bits (Read)
 
-| Bit | Address | Name | Description |
-|-----|---------|------|-------------|
-| 0 | DBX1.0 | servo_ready | Servo motor ready |
-| 1 | DBX1.1 | servo_error | Servo fault active |
-| 2 | DBX1.2 | at_home | At home position |
-| 3 | DBX1.3 | lock_upper | Upper clamp locked |
-| 4 | DBX1.4 | lock_lower | Lower clamp locked |
+| Byte | Bit | Address | Name | Description |
+|------|-----|---------|------|-------------|
+| 0 | 0 | DBX0.0 | Enable | Servo enable status (echo) |
+| 0 | 7 | DBX0.7 | Servo_Ready | Servo motor ready |
+| 1 | 0 | DBX1.0 | Servo_Error | Servo fault active |
+| 1 | 1 | DBX1.1 | At_Home | At home position |
+| 14 | 0 | DBX14.0 | Lock_Upper | Upper clamp locked status |
+| 14 | 1 | DBX14.1 | Lock_Lower | Lower clamp locked status |
+| 20 | 0 | DBX20.0 | MC_Power | Motion control power on |
+| 20 | 1 | DBX20.1 | MC_Busy | Motion control busy |
+| 20 | 2 | DBX20.2 | MC_Error | Motion control error |
+| 25 | 0 | DBX25.0 | Remote_Mode | Remote mode status (echo) |
 
-#### Analog Values
+#### Analog Values (Real - 4 bytes)
 
-| Offset | Type | Name | Unit | Description |
-|--------|------|------|------|-------------|
-| 2 | Real | jog_velocity | mm/min | Jog speed setpoint (1-100) |
-| 6 | Real | actual_position | mm | Current actuator position |
+| Offset | Address | Name | Unit | Description |
+|--------|---------|------|------|-------------|
+| 2 | DBD2 | Actual_Position | mm | Current actuator position |
+| 6 | DBD6 | Target_Position | mm | Target position setpoint |
+| 10 | DBD10 | Actual_Speed | mm/min | Current speed |
+| 16 | DBD16 | Jog_Velocity | mm/min | Jog speed setpoint (1-100) |
 
 **Memory Layout:**
 ```
-DB3
-├── DBX0.0 : enable (Bool)
-├── DBX0.1 : jog_forward (Bool)
-├── DBX0.2 : jog_backward (Bool)
-├── DBX0.3 : start_test (Bool)
-├── DBX0.4 : stop (Bool)
-├── DBX0.5 : home (Bool)
-├── DBX0.6 : alarm_reset (Bool)
-├── DBX1.0 : servo_ready (Bool)
-├── DBX1.1 : servo_error (Bool)
-├── DBX1.2 : at_home (Bool)
-├── DBX1.3 : lock_upper (Bool)
-├── DBX1.4 : lock_lower (Bool)
-├── DBD2   : jog_velocity (Real, 4 bytes)
-└── DBD6   : actual_position (Real, 4 bytes)
+DB3 - Servo Control Data Block
+├── Byte 0 (Commands)
+│   ├── DBX0.0 : Enable
+│   ├── DBX0.1 : Jog_Forward
+│   ├── DBX0.2 : Jog_Backward
+│   ├── DBX0.3 : Start_Test
+│   ├── DBX0.4 : Stop
+│   ├── DBX0.5 : Reset
+│   ├── DBX0.6 : Home
+│   └── DBX0.7 : Servo_Ready (status)
+│
+├── Byte 1 (Status)
+│   ├── DBX1.0 : Servo_Error
+│   └── DBX1.1 : At_Home
+│
+├── DBD2  : Actual_Position (Real, 4 bytes)
+├── DBD6  : Target_Position (Real, 4 bytes)
+├── DBD10 : Actual_Speed (Real, 4 bytes)
+│
+├── Byte 14 (Clamps)
+│   ├── DBX14.0 : Lock_Upper
+│   └── DBX14.1 : Lock_Lower
+│
+├── DBD16 : Jog_Velocity (Real, 4 bytes)
+│
+├── Byte 20 (MC Status)
+│   ├── DBX20.0 : MC_Power
+│   ├── DBX20.1 : MC_Busy
+│   └── DBX20.2 : MC_Error
+│
+└── Byte 25 (Mode)
+    └── DBX25.0 : Remote_Mode
 ```
 
 ---
@@ -190,23 +217,37 @@ Located in `backend/plc/data_service.py`:
 
 ```python
 class DataService:
-    """Read data from PLC"""
+    """Read data from PLC via DB3"""
+
+    DB_NUMBER = 3
+
+    # Status bits
+    STATUS_ENABLE = (0, 0)        # DB3.DBX0.0
+    STATUS_SERVO_READY = (0, 7)   # DB3.DBX0.7
+    STATUS_SERVO_ERROR = (1, 0)   # DB3.DBX1.0
+    STATUS_AT_HOME = (1, 1)       # DB3.DBX1.1
+    STATUS_LOCK_UPPER = (14, 0)   # DB3.DBX14.0
+    STATUS_LOCK_LOWER = (14, 1)   # DB3.DBX14.1
+    STATUS_MC_POWER = (20, 0)     # DB3.DBX20.0
+    STATUS_MC_BUSY = (20, 1)      # DB3.DBX20.1
+    STATUS_MC_ERROR = (20, 2)     # DB3.DBX20.2
+    STATUS_REMOTE_MODE = (25, 0)  # DB3.DBX25.0
+
+    # Real values
+    VAL_ACTUAL_POSITION = 2       # DB3.DBD2
+    VAL_TARGET_POSITION = 6       # DB3.DBD6
+    VAL_ACTUAL_SPEED = 10         # DB3.DBD10
+    VAL_JOG_VELOCITY = 16         # DB3.DBD16
 
     def get_live_data(self) -> dict:
         """Read all real-time values - called every 100ms"""
         return {
-            "actual_force": self.plc.read_real(2, 0),
-            "actual_deflection": self.plc.read_real(2, 4),
-            "servo_ready": self.plc.read_bool(3, 1, 0),
+            "servo_ready": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_SERVO_READY),
+            "servo_error": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_SERVO_ERROR),
+            "at_home": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_AT_HOME),
+            "remote_mode": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_REMOTE_MODE),
+            "actual_position": self.plc.read_real(self.DB_NUMBER, self.VAL_ACTUAL_POSITION),
             "connected": True,
-            # ... more fields
-        }
-
-    def get_parameters(self) -> dict:
-        """Read test parameters from DB1"""
-        return {
-            "pipe_diameter": self.plc.read_real(1, 0),
-            "pipe_length": self.plc.read_real(1, 4),
             # ... more fields
         }
 ```
@@ -217,21 +258,38 @@ Located in `backend/plc/command_service.py`:
 
 ```python
 class CommandService:
-    """Send commands to PLC"""
+    """Send commands to PLC via DB3"""
 
-    def start_test(self) -> bool:
-        """Start automated test - DB3.DBX0.3"""
-        return self.plc.write_bool(3, 0, 3, True)
+    DB_NUMBER = 3
 
-    def stop(self) -> bool:
-        """Emergency stop - DB3.DBX0.4 (pulse)"""
-        self.plc.write_bool(3, 0, 4, True)
-        time.sleep(0.1)
-        return self.plc.write_bool(3, 0, 4, False)
+    # Commands (Byte 0)
+    CMD_ENABLE = (0, 0)         # DB3.DBX0.0
+    CMD_JOG_FORWARD = (0, 1)    # DB3.DBX0.1
+    CMD_JOG_BACKWARD = (0, 2)   # DB3.DBX0.2
+    CMD_START_TEST = (0, 3)     # DB3.DBX0.3
+    CMD_STOP = (0, 4)           # DB3.DBX0.4
+    CMD_RESET = (0, 5)          # DB3.DBX0.5
+    CMD_HOME = (0, 6)           # DB3.DBX0.6
+
+    # Clamps (Byte 14)
+    CMD_LOCK_UPPER = (14, 0)    # DB3.DBX14.0
+    CMD_LOCK_LOWER = (14, 1)    # DB3.DBX14.1
+
+    # Mode (Byte 25)
+    CMD_REMOTE_MODE = (25, 0)   # DB3.DBX25.0
+
+    # Real Values
+    CMD_JOG_VELOCITY = 16       # DB3.DBD16
 
     def jog_forward(self, state: bool) -> bool:
         """Jog forward - DB3.DBX0.1"""
-        return self.plc.write_bool(3, 0, 1, state)
+        if state:
+            self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_BACKWARD, False)
+        return self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_FORWARD, state)
+
+    def set_remote_mode(self, is_remote: bool) -> bool:
+        """Set remote mode - DB3.DBX25.0"""
+        return self.plc.write_bool(self.DB_NUMBER, *self.CMD_REMOTE_MODE, is_remote)
 ```
 
 ---
