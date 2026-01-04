@@ -51,9 +51,23 @@ Get all live data from PLC.
   "lock_upper": false,
   "lock_lower": false,
   "actual_position": 0.0,
-  "connected": true
+  "remote_mode": true,
+  "e_stop_active": false,
+  "connected": true,
+  "plc": {
+    "connected": true,
+    "cpu_state": "run",
+    "ip": "192.168.0.100"
+  }
 }
 ```
+
+**PLC CPU States:**
+| State | Description |
+|-------|-------------|
+| run | PLC program running |
+| stop | PLC in STOP mode |
+| unknown | Cannot determine state |
 
 **Test Status Codes:**
 | Code | Status |
@@ -65,6 +79,51 @@ Get all live data from PLC.
 | 3 | At Target |
 | 4 | Returning |
 | 5 | Complete |
+
+---
+
+### Control Mode
+
+#### GET /api/mode
+Get current control mode.
+
+**Response:**
+```json
+{
+  "mode": "remote",
+  "remote": true,
+  "jog_web_enabled": true,
+  "description": "Mode affects Jog controls only"
+}
+```
+
+**Note:** Mode only affects Jog controls. All other commands (Enable, Reset, Clamps, etc.) work in both modes.
+
+---
+
+#### POST /api/mode/local
+Switch to LOCAL mode (physical buttons for Jog).
+
+**Response:**
+```json
+{
+  "success": true,
+  "mode": "local"
+}
+```
+
+---
+
+#### POST /api/mode/remote
+Switch to REMOTE mode (web controls for Jog).
+
+**Response:**
+```json
+{
+  "success": true,
+  "mode": "remote"
+}
+```
 
 ---
 
@@ -697,6 +756,24 @@ socket.on('jog_response', (data) => {
   // }
 });
 ```
+
+---
+
+#### jog_rejected
+Emitted when jog command is rejected due to LOCAL mode.
+
+```javascript
+socket.on('jog_rejected', (data) => {
+  console.log(data);
+  // {
+  //   direction: "forward",
+  //   reason: "LOCAL_MODE",
+  //   message: "Jog disabled - System in LOCAL mode"
+  // }
+});
+```
+
+**Note:** This event is only emitted in LOCAL mode when attempting to jog via web controls.
 
 ---
 

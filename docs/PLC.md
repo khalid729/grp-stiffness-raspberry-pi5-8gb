@@ -101,6 +101,7 @@ DB2
 | 14 | 0 | DBX14.0 | Lock_Upper | Latch | Lock upper clamp |
 | 14 | 1 | DBX14.1 | Lock_Lower | Latch | Lock lower clamp |
 | 25 | 0 | DBX25.0 | Remote_Mode | Latch | Enable remote control mode |
+| 25 | 1 | DBX25.1 | E_Stop_Active | Status | E-Stop latched state (read) |
 
 #### Status Bits (Read)
 
@@ -116,6 +117,7 @@ DB2
 | 20 | 1 | DBX20.1 | MC_Busy | Motion control busy |
 | 20 | 2 | DBX20.2 | MC_Error | Motion control error |
 | 25 | 0 | DBX25.0 | Remote_Mode | Remote mode status (echo) |
+| 25 | 1 | DBX25.1 | E_Stop_Active | E-Stop latched state |
 
 #### Analog Values (Real - 4 bytes)
 
@@ -158,8 +160,9 @@ DB3 - Servo Control Data Block
 │   ├── DBX20.1 : MC_Busy
 │   └── DBX20.2 : MC_Error
 │
-└── Byte 25 (Mode)
-    └── DBX25.0 : Remote_Mode
+└── Byte 25 (Mode & E-Stop)
+    ├── DBX25.0 : Remote_Mode
+    └── DBX25.1 : E_Stop_Active (read-only)
 ```
 
 ---
@@ -232,6 +235,7 @@ class DataService:
     STATUS_MC_BUSY = (20, 1)      # DB3.DBX20.1
     STATUS_MC_ERROR = (20, 2)     # DB3.DBX20.2
     STATUS_REMOTE_MODE = (25, 0)  # DB3.DBX25.0
+    STATUS_ESTOP_ACTIVE = (25, 1) # DB3.DBX25.1
 
     # Real values
     VAL_ACTUAL_POSITION = 2       # DB3.DBD2

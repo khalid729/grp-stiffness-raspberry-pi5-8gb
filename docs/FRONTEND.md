@@ -358,6 +358,16 @@ function Settings() {
 ### LiveData
 
 ```typescript
+// PLC CPU State
+type PLCCpuState = 'run' | 'stop' | 'unknown';
+
+// PLC Status
+interface PLCStatus {
+  connected: boolean;
+  cpu_state: PLCCpuState;
+  ip: string;
+}
+
 interface LiveData {
   actual_force: number;        // Current force (kN)
   actual_deflection: number;   // Current deflection (mm)
@@ -373,7 +383,10 @@ interface LiveData {
   lock_upper: boolean;
   lock_lower: boolean;
   actual_position: number;
+  remote_mode: boolean;        // Remote/Local mode
+  e_stop_active: boolean;      // E-Stop latched state
   connected: boolean;
+  plc: PLCStatus;              // PLC connection & CPU state
 }
 ```
 
@@ -457,12 +470,23 @@ Test configuration page:
 
 Manual control panel:
 
-- Jog up/down buttons (hold to move)
+- Jog up/down buttons (hold to move) - **Requires REMOTE mode**
 - Jog speed slider
-- Servo enable/disable
-- Clamp lock/unlock
-- Alarm reset
-- Emergency stop
+- Servo enable/disable - **Works in any mode**
+- Clamp lock/unlock - **Works in any mode**
+- Alarm reset - **Works in any mode**
+- Emergency stop - **Always available**
+- E-Stop active indicator with warning
+- PLC STOP mode warning
+
+**Mode Behavior:**
+| Control | LOCAL Mode | REMOTE Mode |
+|---------|------------|-------------|
+| Jog Up/Down | Disabled (grayed) | Enabled |
+| Enable/Disable | Enabled | Enabled |
+| Reset Alarm | Enabled | Enabled |
+| Lock/Unlock | Enabled | Enabled |
+| E-Stop | Always Available | Always Available |
 
 ### Reports
 

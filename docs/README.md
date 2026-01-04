@@ -204,12 +204,23 @@ This system is designed for testing according to:
 
 ---
 
+## Project Information
+
+| Field | Value |
+|-------|-------|
+| **Company** | MNT |
+| **Developer** | Khalid Ibrahim Almuhaideb |
+| **Version** | 1.0.0 |
+| **Standard** | ISO 9969 |
+
+---
+
 ## License
 
-Proprietary - Al Muhaideb Industrial
+Proprietary - MNT
 
 ---
 
 ## Support
 
-For technical support: support@almuhaideb.com
+For technical support contact the developer.
