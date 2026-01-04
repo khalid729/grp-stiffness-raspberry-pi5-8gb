@@ -73,6 +73,14 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Company</span>
+              <span className="font-mono">MNT</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Developer</span>
+              <span className="font-mono">Khalid Ibrahim Almuhaideb</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Version</span>
               <span className="font-mono">1.0.0</span>
             </div>

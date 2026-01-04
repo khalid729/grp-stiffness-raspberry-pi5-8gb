@@ -59,6 +59,9 @@ async def lifespan(app: FastAPI):
     # Connect to PLC
     if plc.connect():
         logger.info(f"Connected to PLC at {settings.PLC_IP}")
+        # Set default mode to REMOTE on startup
+        if command_service.set_remote_mode(True):
+            logger.info("Default mode set to REMOTE")
     else:
         logger.warning(f"Could not connect to PLC at {settings.PLC_IP} - running in offline mode")
 

@@ -73,7 +73,8 @@ const ManualControl = () => {
 
   // Mode control
   const isLocalMode = !liveData.remote_mode;
-  const controlsDisabled = isLocalMode || !isConnected;
+  const jogDisabled = isLocalMode || !isConnected;  // Jog needs Remote mode
+  const commandsDisabled = !isConnected;  // Other commands work in any mode
   const isTestRunning = liveData.test_status === 2;
   const isMoving = isJogging !== null;
   const isEStopActive = liveData.e_stop_active;
@@ -93,48 +94,48 @@ const ManualControl = () => {
 
   // Jog Up (backward) - simple start, global handler will stop
   const handleJogUpStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (controlsDisabled || jogUpActive.current) return;
+    if (jogDisabled || jogUpActive.current) return;
     e.preventDefault();
     e.stopPropagation();
     jogUpActive.current = true;
     setIsJogging('up');
     jogBackward(true);
-  }, [jogBackward, controlsDisabled]);
+  }, [jogBackward, jogDisabled]);
 
   // Jog Down (forward) - simple start, global handler will stop
   const handleJogDownStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (controlsDisabled || jogDownActive.current) return;
+    if (jogDisabled || jogDownActive.current) return;
     e.preventDefault();
     e.stopPropagation();
     jogDownActive.current = true;
     setIsJogging('down');
     jogForward(true);
-  }, [jogForward, controlsDisabled]);
+  }, [jogForward, jogDisabled]);
 
-  // Clamp controls
+  // Clamp controls - work in any mode
   const handleLockUpper = () => {
-    if (!controlsDisabled) lockUpper.mutate();
+    if (!commandsDisabled) lockUpper.mutate();
   };
 
   const handleLockLower = () => {
-    if (!controlsDisabled) lockLower.mutate();
+    if (!commandsDisabled) lockLower.mutate();
   };
 
   const handleUnlockAll = () => {
-    if (!controlsDisabled) unlockAll.mutate();
+    if (!commandsDisabled) unlockAll.mutate();
   };
 
-  // Servo controls
+  // Servo controls - work in any mode
   const handleServoEnable = () => {
-    if (!controlsDisabled) enableServo.mutate();
+    if (!commandsDisabled) enableServo.mutate();
   };
 
   const handleServoDisable = () => {
-    if (!controlsDisabled) disableServo.mutate();
+    if (!commandsDisabled) disableServo.mutate();
   };
 
   const handleResetAlarm = () => {
-    if (!controlsDisabled) resetAlarm.mutate();
+    if (!commandsDisabled) resetAlarm.mutate();
   };
 
   return (
@@ -232,7 +233,7 @@ const ManualControl = () => {
             <button
               onPointerDown={handleJogUpStart}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={controlsDisabled || !liveData.servo_ready || isEStopActive}
+              disabled={jogDisabled || !liveData.servo_ready || isEStopActive}
               style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
               className={cn(
                 'jog-button w-full flex flex-col items-center justify-center gap-2',
@@ -256,7 +257,7 @@ const ManualControl = () => {
                 max={100}
                 step={1}
                 className="touch-slider"
-                disabled={controlsDisabled}
+                disabled={jogDisabled}
               />
             </div>
 
@@ -264,7 +265,7 @@ const ManualControl = () => {
             <button
               onPointerDown={handleJogDownStart}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={controlsDisabled || !liveData.servo_ready || isEStopActive}
+              disabled={jogDisabled || !liveData.servo_ready || isEStopActive}
               style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
               className={cn(
                 'jog-button w-full flex flex-col items-center justify-center gap-2',
@@ -288,7 +289,7 @@ const ManualControl = () => {
               variant="success"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || lockUpper.isPending}
+              disabled={commandsDisabled || lockUpper.isPending}
             >
               <Lock className="w-5 h-5" />
               {t('manual.lockUpper')}
@@ -299,7 +300,7 @@ const ManualControl = () => {
               variant="success"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || lockLower.isPending}
+              disabled={commandsDisabled || lockLower.isPending}
             >
               <Lock className="w-5 h-5" />
               {t('manual.lockLower')}
@@ -310,7 +311,7 @@ const ManualControl = () => {
               variant="destructive"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || unlockAll.isPending}
+              disabled={commandsDisabled || unlockAll.isPending}
             >
               <Unlock className="w-5 h-5" />
               {t('manual.unlockAll')}
@@ -343,7 +344,7 @@ const ManualControl = () => {
               variant="success"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || enableServo.isPending}
+              disabled={commandsDisabled || enableServo.isPending}
             >
               <Power className="w-5 h-5" />
               {t('manual.enable')}
@@ -354,7 +355,7 @@ const ManualControl = () => {
               variant="outline"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || disableServo.isPending}
+              disabled={commandsDisabled || disableServo.isPending}
             >
               <PowerOff className="w-5 h-5" />
               {t('manual.disable')}
@@ -365,7 +366,7 @@ const ManualControl = () => {
               variant="warning"
               size="lg"
               className="w-full gap-2"
-              disabled={controlsDisabled || resetAlarm.isPending}
+              disabled={commandsDisabled || resetAlarm.isPending}
             >
               <RotateCcw className="w-5 h-5" />
               {t('manual.resetAlarm')}
