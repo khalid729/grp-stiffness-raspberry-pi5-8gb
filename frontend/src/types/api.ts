@@ -1,3 +1,13 @@
+// PLC CPU State
+export type PLCCpuState = 'run' | 'stop' | 'unknown';
+
+// PLC Status
+export interface PLCStatus {
+  connected: boolean;
+  cpu_state: PLCCpuState;
+  ip: string;
+}
+
 // Live data from PLC
 export interface LiveData {
   actual_force: number;
@@ -21,6 +31,10 @@ export interface LiveData {
   lock_lower: boolean;
   remote_mode: boolean;
   connected: boolean;
+  // NEW: E-Stop Active State
+  e_stop_active: boolean;
+  // NEW: PLC Status with CPU State
+  plc: PLCStatus;
 }
 
 // Test parameters

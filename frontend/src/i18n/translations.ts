@@ -97,6 +97,21 @@ export const translations = {
       connected: 'Connected',
       disconnected: 'Disconnected',
     },
+    estop: {
+      button: 'E-STOP',
+      active: 'ACTIVE',
+      activeTitle: 'Emergency Stop Active',
+      activeDescription: 'Press Reset Alarm then Enable to resume operation',
+    },
+    plc: {
+      connected: 'Connected',
+      disconnected: 'Disconnected',
+      run: 'RUN',
+      stop: 'STOP',
+      connectedRun: 'Connected (RUN)',
+      connectedStop: 'PLC in STOP Mode',
+      stopWarning: 'Program is not running. Switch PLC to RUN mode.',
+    },
   },
   ar: {
     nav: {
@@ -195,6 +210,21 @@ export const translations = {
     connection: {
       connected: 'متصل',
       disconnected: 'غير متصل',
+    },
+    estop: {
+      button: 'إيقاف طوارئ',
+      active: 'مفعل',
+      activeTitle: 'الإيقاف الطارئ مفعل',
+      activeDescription: 'اضغط Reset ثم Enable لاستئناف التشغيل',
+    },
+    plc: {
+      connected: 'متصل',
+      disconnected: 'غير متصل',
+      run: 'يعمل',
+      stop: 'متوقف',
+      connectedRun: 'متصل (يعمل)',
+      connectedStop: 'الـ PLC في وضع التوقف',
+      stopWarning: 'البرنامج لا يعمل. حول الـ PLC إلى وضع RUN.',
     },
   },
 };

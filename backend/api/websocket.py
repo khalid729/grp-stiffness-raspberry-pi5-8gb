@@ -67,11 +67,20 @@ async def jog_forward(sid, data):
     """Handle jog forward command from client"""
     if command_service:
         state = data.get('state', False)
-        success = command_service.jog_forward(state)
+        result = command_service.jog_forward(state)
+
+        # Check if jog was rejected due to LOCAL mode
+        if not result.get('success') and result.get('reason') == 'LOCAL_MODE':
+            await sio.emit('jog_rejected', {
+                'direction': 'forward',
+                'reason': result.get('reason'),
+                'message': result.get('message')
+            }, room=sid)
+
         await sio.emit('jog_response', {
             'direction': 'forward',
             'state': state,
-            'success': success
+            'success': result.get('success', False)
         }, room=sid)
 
 
@@ -80,11 +89,20 @@ async def jog_backward(sid, data):
     """Handle jog backward command from client"""
     if command_service:
         state = data.get('state', False)
-        success = command_service.jog_backward(state)
+        result = command_service.jog_backward(state)
+
+        # Check if jog was rejected due to LOCAL mode
+        if not result.get('success') and result.get('reason') == 'LOCAL_MODE':
+            await sio.emit('jog_rejected', {
+                'direction': 'backward',
+                'reason': result.get('reason'),
+                'message': result.get('message')
+            }, room=sid)
+
         await sio.emit('jog_response', {
             'direction': 'backward',
             'state': state,
-            'success': success
+            'success': result.get('success', False)
         }, room=sid)
 
 

@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 class PLCConnector:
     """Snap7 PLC Connection Handler for Siemens S7-1214C"""
 
+    # CPU State Constants
+    CPU_STATE_RUN = 0x08
+    CPU_STATE_STOP = 0x04
+    CPU_STATE_UNKNOWN = 0x00
+
     def __init__(
         self,
         ip: str = settings.PLC_IP,
@@ -52,6 +57,11 @@ class PLCConnector:
         try:
             if self.connected:
                 return True
+            # Always disconnect first to reset client state
+            try:
+                self.client.disconnect()
+            except Exception:
+                pass
             self.client.connect(self.ip, self.rack, self.slot)
             self._connected = self.client.get_connected()
             if self._connected:
@@ -76,6 +86,27 @@ class PLCConnector:
         """Reconnect to PLC"""
         self.disconnect()
         return self.connect()
+
+    def get_cpu_state(self) -> str:
+        """Get PLC CPU state (RUN/STOP)
+
+        Returns: 'run' | 'stop' | 'unknown'
+        """
+        if not self._connected:
+            return "unknown"
+
+        try:
+            with self.lock:
+                state = self.client.get_cpu_state()
+                if state == self.CPU_STATE_RUN:
+                    return "run"
+                elif state == self.CPU_STATE_STOP:
+                    return "stop"
+                else:
+                    return "unknown"
+        except Exception as e:
+            logger.error(f"Error reading CPU state: {e}")
+            return "unknown"
 
     def read_real(self, db_number: int, offset: int) -> Optional[float]:
         """Read a Real (float) value from DB"""

@@ -65,6 +65,10 @@ class CommandService:
             return False
         return True
 
+    def _check_remote_mode(self) -> bool:
+        """Check if system is in REMOTE mode"""
+        return self.plc.read_bool(self.DB_NUMBER, *self.CMD_REMOTE_MODE) or False
+
     # ========== Servo Control ==========
 
     def enable_servo(self) -> bool:
@@ -94,27 +98,45 @@ class CommandService:
         logger.info("Alarm reset (DB3.DBX0.5 pulse)")
         return result
 
-    # ========== Jog Control ==========
+    # ========== Jog Control - Requires REMOTE Mode ==========
 
-    def jog_forward(self, state: bool) -> bool:
-        """Jog forward - DB3.DBX0.1"""
+    def jog_forward(self, state: bool) -> dict:
+        """Jog forward - DB3.DBX0.1 - Requires REMOTE mode"""
         if not self._check_connection():
-            return False
+            return {"success": False, "reason": "DISCONNECTED", "message": "PLC not connected"}
+
+        # Check remote mode only when starting jog (state=True)
+        if state and not self._check_remote_mode():
+            return {
+                "success": False,
+                "reason": "LOCAL_MODE",
+                "message": "Jog disabled - System in LOCAL mode"
+            }
+
         if state:
             self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_BACKWARD, False)
         result = self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_FORWARD, state)
         logger.info(f"Jog forward: {state} (DB3.DBX0.1)")
-        return result
+        return {"success": result}
 
-    def jog_backward(self, state: bool) -> bool:
-        """Jog backward - DB3.DBX0.2"""
+    def jog_backward(self, state: bool) -> dict:
+        """Jog backward - DB3.DBX0.2 - Requires REMOTE mode"""
         if not self._check_connection():
-            return False
+            return {"success": False, "reason": "DISCONNECTED", "message": "PLC not connected"}
+
+        # Check remote mode only when starting jog (state=True)
+        if state and not self._check_remote_mode():
+            return {
+                "success": False,
+                "reason": "LOCAL_MODE",
+                "message": "Jog disabled - System in LOCAL mode"
+            }
+
         if state:
             self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_FORWARD, False)
         result = self.plc.write_bool(self.DB_NUMBER, *self.CMD_JOG_BACKWARD, state)
         logger.info(f"Jog backward: {state} (DB3.DBX0.2)")
-        return result
+        return {"success": result}
 
     def set_jog_velocity(self, velocity: float) -> bool:
         """Set jog speed - DB3.DBD16 (mm/min)"""

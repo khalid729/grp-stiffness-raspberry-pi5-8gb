@@ -24,6 +24,12 @@ const defaultLiveData: LiveData = {
   lock_lower: false,
   remote_mode: false,
   connected: false,
+  e_stop_active: false,
+  plc: {
+    connected: false,
+    cpu_state: 'unknown',
+    ip: ''
+  }
 };
 
 // Real live data from WebSocket

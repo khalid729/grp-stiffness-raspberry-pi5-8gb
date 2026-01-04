@@ -13,10 +13,12 @@ install-backend:
 install-frontend:
 	cd frontend && npm install
 
-# Run both (use two terminals)
+# Run both backend and frontend together
 dev:
-	@echo "Run 'make dev-backend' in one terminal"
-	@echo "Run 'make dev-frontend' in another terminal"
+	@trap 'kill 0' EXIT; \
+	(cd backend && . venv/bin/activate && uvicorn main:socket_app --host 0.0.0.0 --port 8000 --reload) & \
+	(cd frontend && npm run dev) & \
+	wait
 
 # Run backend only
 dev-backend:

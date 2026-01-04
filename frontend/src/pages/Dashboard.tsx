@@ -128,9 +128,11 @@ const Dashboard = () => {
         
         {/* E-Stop - Isolated Emergency Control */}
         <div className="flex-shrink-0 p-2 rounded-xl bg-destructive/5 border border-destructive/20">
-          <EStopButton 
+          <EStopButton
             size="md"
             label={t('actions.eStop')}
+            activeLabel={t('estop.active')}
+            isActive={liveData.e_stop_active}
             onClick={handleStop}
           />
         </div>

@@ -50,6 +50,7 @@ class DataService:
     STATUS_MC_BUSY = (20, 1)      # DB3.DBX20.1 - MC Busy
     STATUS_MC_ERROR = (20, 2)     # DB3.DBX20.2 - MC Error
     STATUS_REMOTE_MODE = (25, 0)  # DB3.DBX25.0 - Remote mode
+    STATUS_ESTOP_ACTIVE = (25, 1) # DB3.DBX25.1 - E-Stop latched state
 
     # ═══════════════════════════════════════════════════════════════════
     # REAL VALUES
@@ -101,6 +102,7 @@ class DataService:
                 "mc_power": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_MC_POWER) or False,
                 "mc_busy": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_MC_BUSY) or False,
                 "mc_error": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_MC_ERROR) or False,
+                "e_stop_active": self.plc.read_bool(self.DB_NUMBER, *self.STATUS_ESTOP_ACTIVE) or False,
 
                 # ═══════════════════════════════════════════════════════════
                 # REAL VALUES from DB3
@@ -127,8 +129,15 @@ class DataService:
                 "test_status": 0,
                 "test_passed": False,
 
-                # Connection
+                # ═══════════════════════════════════════════════════════════
+                # PLC STATUS
+                # ═══════════════════════════════════════════════════════════
                 "connected": True,
+                "plc": {
+                    "connected": True,
+                    "cpu_state": self.plc.get_cpu_state(),
+                    "ip": self.plc.ip
+                }
             }
         except Exception as e:
             logger.error(f"Error reading live data: {e}")
@@ -147,6 +156,7 @@ class DataService:
             "mc_power": False,
             "mc_busy": False,
             "mc_error": False,
+            "e_stop_active": False,
             "actual_position": 0.0,
             "target_position": 0.0,
             "actual_speed": 0.0,
@@ -161,6 +171,11 @@ class DataService:
             "test_status": -1,
             "test_passed": False,
             "connected": False,
+            "plc": {
+                "connected": False,
+                "cpu_state": "unknown",
+                "ip": self.plc.ip
+            }
         }
 
     def get_parameters(self) -> Dict[str, Any]:

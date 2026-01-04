@@ -16,10 +16,14 @@ import {
   RotateCcw,
   Gauge,
   Move,
-  Target
+  Target,
+  AlertTriangle,
+  OctagonX,
+  PauseCircle
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLiveData, useJogControl } from '@/hooks/useLiveData';
-import { useServoControl, useClampControl, useModeControl } from '@/hooks/useApi';
+import { useServoControl, useClampControl, useModeControl, useCommands } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +34,7 @@ const ManualControl = () => {
   const { enableServo, disableServo, resetAlarm } = useServoControl();
   const { lockUpper, lockLower, unlockAll } = useClampControl();
   const { setMode } = useModeControl();
+  const { stopTest } = useCommands();
 
   const [jogSpeedLocal, setJogSpeedLocal] = useState(50);
   const [isJogging, setIsJogging] = useState<'up' | 'down' | null>(null);
@@ -71,6 +76,8 @@ const ManualControl = () => {
   const controlsDisabled = isLocalMode || !isConnected;
   const isTestRunning = liveData.test_status === 2;
   const isMoving = isJogging !== null;
+  const isEStopActive = liveData.e_stop_active;
+  const isPLCStop = liveData.plc?.cpu_state === 'stop';
 
   // Call real API to change mode in PLC
   const handleModeChange = (remoteMode: boolean) => {
@@ -145,11 +152,40 @@ const ManualControl = () => {
         </div>
 
         {/* E-Stop Always Available - Circular Industrial Style */}
-        <EStopButton 
+        <EStopButton
           size="lg"
           label={t('actions.eStop')}
+          activeLabel={t('estop.active')}
+          isActive={liveData.e_stop_active}
+          onClick={() => stopTest.mutate()}
         />
       </div>
+
+      {/* E-Stop Active Warning */}
+      {isEStopActive && (
+        <Alert variant="destructive" className="animate-pulse border-red-500 bg-red-50">
+          <OctagonX className="h-5 w-5" />
+          <AlertTitle className="text-red-700 font-bold">
+            {t('estop.activeTitle')}
+          </AlertTitle>
+          <AlertDescription className="text-red-600">
+            {t('estop.activeDescription')}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* PLC STOP Mode Warning */}
+      {isPLCStop && !isEStopActive && (
+        <Alert className="border-orange-500 bg-orange-50">
+          <PauseCircle className="h-5 w-5 text-orange-500" />
+          <AlertTitle className="text-orange-700 font-bold">
+            {t('plc.connectedStop')}
+          </AlertTitle>
+          <AlertDescription className="text-orange-600">
+            {t('plc.stopWarning')}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Live Values Row */}
       <div className="grid grid-cols-3 gap-3">
@@ -196,7 +232,7 @@ const ManualControl = () => {
             <button
               onPointerDown={handleJogUpStart}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={controlsDisabled || !liveData.servo_ready}
+              disabled={controlsDisabled || !liveData.servo_ready || isEStopActive}
               style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
               className={cn(
                 'jog-button w-full flex flex-col items-center justify-center gap-2',
@@ -228,7 +264,7 @@ const ManualControl = () => {
             <button
               onPointerDown={handleJogDownStart}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={controlsDisabled || !liveData.servo_ready}
+              disabled={controlsDisabled || !liveData.servo_ready || isEStopActive}
               style={{ touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
               className={cn(
                 'jog-button w-full flex flex-col items-center justify-center gap-2',
