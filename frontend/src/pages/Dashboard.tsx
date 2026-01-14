@@ -1,48 +1,70 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusCard } from '@/components/dashboard/StatusCard';
 import { MachineIndicator } from '@/components/dashboard/MachineIndicator';
 import { TestStatusBadge } from '@/components/dashboard/TestStatusBadge';
 import { ForceDeflectionChart } from '@/components/dashboard/ForceDeflectionChart';
+import { SafetyIndicators } from '@/components/dashboard/SafetyIndicators';
+import { TestProgress } from '@/components/dashboard/TestProgress';
 import { ModeSelector } from '@/components/ModeSelector';
 import { TouchButton } from '@/components/ui/TouchButton';
 import { EStopButton } from '@/components/ui/EStopButton';
-import { Gauge, Move, Target, Activity, Home, Play, Square } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Gauge, Move, Target, Activity, Home, Play, Square, RotateCcw, Scale } from 'lucide-react';
 import { useLiveData } from '@/hooks/useLiveData';
-import { useCommands, useModeControl } from '@/hooks/useApi';
+import { useCommands, useModeControl, useTareControl } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const Dashboard = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { liveData, isConnected } = useLiveData();
   const { startTest, stopTest, goHome } = useCommands();
   const { setMode } = useModeControl();
+  const { tareLoadCell, zeroPosition } = useTareControl();
 
   // Chart data - accumulate from live data
   const [chartData, setChartData] = useState<{ deflection: number; force: number }[]>([]);
 
+  // Get safety data (support both new and old structure)
+  const safety = liveData.safety || {
+    e_stop: liveData.e_stop_active || false,
+    upper_limit: liveData.upper_limit || false,
+    lower_limit: liveData.lower_limit || false,
+    home: liveData.at_home || false,
+    ok: true,
+    motion_allowed: true,
+  };
+
+  // Get test data (support both new and old structure)
+  const testStage = liveData.test?.stage ?? 0;
+  const testProgress = liveData.test?.progress ?? liveData.test_progress ?? 0;
+
   // Mode state
-  const isLocalMode = !liveData.remote_mode;
+  const isLocalMode = !liveData.remote_mode && !(liveData.mode?.remote);
   const controlsDisabled = isLocalMode || !isConnected;
-  const isTestRunning = liveData.test_status === 2;
+  const isTestRunning = liveData.test_status === 2 || (testStage >= 1 && testStage <= 7);
+
+  // Get force value (support both new and old structure)
+  const forceKN = liveData.force?.kN ?? liveData.actual_force ?? 0;
+  const forceN = forceKN * 1000;
 
   // Update chart data when testing
   useEffect(() => {
-    if (liveData.test_status === 2) {
+    if (liveData.test_status === 2 || isTestRunning) {
       setChartData(prev => {
         const lastPoint = prev[prev.length - 1];
-        if (lastPoint &&
-            Math.abs(lastPoint.deflection - liveData.actual_deflection) < 0.01) {
+        const currentDeflection = liveData.deflection?.actual ?? liveData.actual_deflection ?? 0;
+        if (lastPoint && Math.abs(lastPoint.deflection - currentDeflection) < 0.01) {
           return prev;
         }
         return [...prev, {
-          deflection: liveData.actual_deflection,
-          force: liveData.actual_force,
+          deflection: currentDeflection,
+          force: forceN,
         }];
       });
-    } else if (liveData.test_status === 1) {
+    } else if (liveData.test_status === 1 || testStage === 1) {
       setChartData([]);
     }
-  }, [liveData.actual_deflection, liveData.actual_force, liveData.test_status]);
+  }, [liveData.actual_deflection, liveData.deflection?.actual, forceN, liveData.test_status, testStage, isTestRunning]);
 
   // Call real API to change mode in PLC
   const handleModeChange = (remoteMode: boolean) => {
@@ -62,7 +84,18 @@ const Dashboard = () => {
     stopTest.mutate();
   };
 
+  const handleTare = () => {
+    tareLoadCell.mutate();
+  };
+
+  const handleZeroPosition = () => {
+    zeroPosition.mutate();
+  };
+
   const testStatus = liveData.test_status as 0 | 1 | 2 | 3 | 4 | 5 | -1;
+  const actualPosition = liveData.position?.actual ?? liveData.actual_position ?? 0;
+  const targetDeflection = liveData.deflection?.target ?? liveData.target_deflection ?? 0;
+  const actualDeflection = liveData.deflection?.actual ?? liveData.actual_deflection ?? 0;
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 animate-slide-up">
@@ -81,10 +114,86 @@ const Dashboard = () => {
 
         {/* Mode Selector - Compact */}
         <ModeSelector
-          remoteMode={liveData.remote_mode}
+          remoteMode={liveData.remote_mode || liveData.mode?.remote || false}
           onModeChange={handleModeChange}
           isTestRunning={isTestRunning}
           variant="compact"
+        />
+      </div>
+
+      {/* Safety Indicators */}
+      <SafetyIndicators
+        eStop={safety.e_stop}
+        upperLimit={safety.upper_limit}
+        lowerLimit={safety.lower_limit}
+        home={safety.home}
+        safetyOk={safety.ok}
+        motionAllowed={safety.motion_allowed}
+      />
+
+      {/* Test Progress */}
+      {(isTestRunning || testStage > 0) && (
+        <TestProgress
+          stage={testStage}
+          progress={testProgress}
+          isRunning={isTestRunning}
+        />
+      )}
+
+      {/* Status Cards with TARE/ZERO buttons */}
+      <div className="status-grid">
+        <div className="space-y-2">
+          <StatusCard
+            title={t('dashboard.force')}
+            value={forceN.toFixed(0)}
+            unit="N"
+            icon={<Gauge className="w-5 h-5" />}
+            variant="info"
+          />
+          <TouchButton
+            variant="outline"
+            size="sm"
+            onClick={handleTare}
+            disabled={controlsDisabled || tareLoadCell.isPending || isTestRunning}
+            className="w-full gap-2"
+          >
+            <Scale className="w-4 h-4" />
+            {t('actions.tare') || 'TARE'}
+          </TouchButton>
+        </div>
+        
+        <StatusCard
+          title={t('dashboard.deflection')}
+          value={actualDeflection.toFixed(2)}
+          unit="mm"
+          icon={<Move className="w-5 h-5" />}
+          variant="warning"
+        />
+        
+        <div className="space-y-2">
+          <StatusCard
+            title={t('dashboard.position')}
+            value={actualPosition.toFixed(2)}
+            unit="mm"
+            icon={<Target className="w-5 h-5" />}
+          />
+          <TouchButton
+            variant="outline"
+            size="sm"
+            onClick={handleZeroPosition}
+            disabled={controlsDisabled || zeroPosition.isPending || isTestRunning}
+            className="w-full gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            {t('actions.zero') || 'ZERO'}
+          </TouchButton>
+        </div>
+        
+        <StatusCard
+          title={t('dashboard.status')}
+          value={t(`status.${['idle', 'starting', 'testing', 'atTarget', 'returning', 'complete'][liveData.test_status] || 'error'}`)}
+          icon={<Activity className="w-5 h-5" />}
+          variant={liveData.test_status === 2 ? 'warning' : liveData.test_status === 5 ? 'success' : 'default'}
         />
       </div>
 
@@ -99,16 +208,16 @@ const Dashboard = () => {
             className="gap-2"
           >
             <Home className="w-5 h-5" />
-            {t('actions.home')}
+            {t('actions.home') || 'HOME'}
           </TouchButton>
           <TouchButton
             variant="success"
             onClick={handleStartTest}
-            disabled={controlsDisabled || !liveData.servo_ready || liveData.servo_error || isTestRunning || startTest.isPending}
+            disabled={controlsDisabled || !liveData.servo_ready || liveData.servo_error || isTestRunning || startTest.isPending || !safety.ok}
             className="gap-2"
           >
             <Play className="w-5 h-5" />
-            {t('actions.start')}
+            {t('actions.start') || 'START'}
           </TouchButton>
           <TouchButton
             variant="destructive"
@@ -117,7 +226,7 @@ const Dashboard = () => {
             className="gap-2"
           >
             <Square className="w-5 h-5" />
-            {t('actions.stop')}
+            {t('actions.stop') || 'STOP'}
           </TouchButton>
         </div>
         
@@ -132,47 +241,17 @@ const Dashboard = () => {
             size="md"
             label={t('actions.eStop')}
             activeLabel={t('estop.active')}
-            isActive={liveData.e_stop_active}
+            isActive={safety.e_stop}
             onClick={handleStop}
           />
         </div>
-      </div>
-
-      {/* Status Cards Row */}
-      <div className="status-grid">
-        <StatusCard
-          title={t('dashboard.force')}
-          value={liveData.actual_force.toFixed(2)}
-          unit="kN"
-          icon={<Gauge className="w-5 h-5" />}
-          variant="info"
-        />
-        <StatusCard
-          title={t('dashboard.deflection')}
-          value={liveData.actual_deflection.toFixed(2)}
-          unit="mm"
-          icon={<Move className="w-5 h-5" />}
-          variant="warning"
-        />
-        <StatusCard
-          title={t('dashboard.position')}
-          value={liveData.actual_position.toFixed(2)}
-          unit="mm"
-          icon={<Target className="w-5 h-5" />}
-        />
-        <StatusCard
-          title={t('dashboard.status')}
-          value={t(`status.${['idle', 'starting', 'testing', 'atTarget', 'returning', 'complete'][liveData.test_status] || 'error'}`)}
-          icon={<Activity className="w-5 h-5" />}
-          variant={liveData.test_status === 2 ? 'warning' : liveData.test_status === 5 ? 'success' : 'default'}
-        />
       </div>
 
       {/* Chart Section */}
       <div className="chart-container relative">
         <ForceDeflectionChart
           data={chartData}
-          targetDeflection={liveData.target_deflection}
+          targetDeflection={targetDeflection}
         />
       </div>
 
@@ -184,24 +263,24 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <MachineIndicator
             label={t('dashboard.servoReady')}
-            isActive={liveData.servo_ready}
+            isActive={liveData.servo_ready || liveData.servo?.ready || false}
           />
           <MachineIndicator
             label={t('dashboard.servoError')}
-            isActive={liveData.servo_error}
-            isError={liveData.servo_error}
+            isActive={liveData.servo_error || liveData.servo?.error || false}
+            isError={liveData.servo_error || liveData.servo?.error || false}
           />
           <MachineIndicator
             label={t('dashboard.upperLock')}
-            isActive={liveData.lock_upper}
+            isActive={liveData.lock_upper || liveData.clamps?.upper || false}
           />
           <MachineIndicator
             label={t('dashboard.lowerLock')}
-            isActive={liveData.lock_lower}
+            isActive={liveData.lock_lower || liveData.clamps?.lower || false}
           />
           <MachineIndicator
             label={t('dashboard.atHome')}
-            isActive={liveData.at_home}
+            isActive={liveData.at_home || liveData.servo?.at_home || false}
           />
         </div>
       </div>

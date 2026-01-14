@@ -8,43 +8,181 @@ export interface PLCStatus {
   ip: string;
 }
 
-// Live data from PLC
-export interface LiveData {
-  actual_force: number;
-  actual_deflection: number;
-  target_deflection: number;
+// Force readings
+export interface ForceData {
+  raw: number;
+  actual: number;
+  filtered: number;
+  kN: number;
+  N: number;
+}
+
+// Position readings
+export interface PositionData {
+  raw: number;
+  actual: number;
+  servo: number;
+  target: number;
+}
+
+// Deflection readings
+export interface DeflectionData {
+  actual: number;
+  percent: number;
+  target: number;
+}
+
+// Test status
+export interface TestData {
+  status: number;
+  stage: number;
+  progress: number;
+  recording: boolean;
+  preload_reached: boolean;
+  passed: boolean;
+}
+
+// Results
+export interface ResultsData {
   ring_stiffness: number;
   force_at_target: number;
   sn_class: number;
-  test_status: number; // -1: disconnected, 0: idle, 1: starting, 2: testing, 3: atTarget, 4: returning, 5: complete
-  test_passed: boolean;
-  servo_ready: boolean;
-  servo_error: boolean;
+  contact_position: number;
+  data_points: number;
+}
+
+// Servo status
+export interface ServoData {
+  ready: boolean;
+  error: boolean;
+  enabled: boolean;
   at_home: boolean;
+  mc_power: boolean;
+  mc_busy: boolean;
+  mc_error: boolean;
+  speed: number;
+  jog_velocity: number;
+}
+
+// Safety status
+export interface SafetyData {
+  e_stop: boolean;
   upper_limit: boolean;
   lower_limit: boolean;
-  e_stop: boolean;
-  start_button: boolean;
-  load_cell_raw: number;
+  home: boolean;
+  ok: boolean;
+  motion_allowed: boolean;
+}
+
+// Clamps
+export interface ClampsData {
+  upper: boolean;
+  lower: boolean;
+}
+
+// Mode
+export interface ModeData {
+  remote: boolean;
+  can_change: boolean;
+}
+
+// Alarm
+export interface AlarmData {
+  active: boolean;
+  code: number;
+}
+
+// Lamps
+export interface LampsData {
+  ready: boolean;
+  running: boolean;
+  error: boolean;
+}
+
+// Live data from PLC - New structure
+export interface LiveData {
+  // Structured data
+  force: ForceData;
+  position: PositionData;
+  deflection: DeflectionData;
+  test: TestData;
+  results: ResultsData;
+  servo: ServoData;
+  safety: SafetyData;
+  clamps: ClampsData;
+  mode: ModeData;
+  alarm: AlarmData;
+  lamps: LampsData;
+  plc: PLCStatus;
+  connected: boolean;
+  
+  // Legacy flat fields for compatibility
+  actual_force: number;
+  actual_deflection: number;
+  target_deflection: number;
   actual_position: number;
+  test_status: number;
+  test_progress: number;
+  servo_ready: boolean;
+  servo_error: boolean;
+  servo_enabled: boolean;
+  at_home: boolean;
   lock_upper: boolean;
   lock_lower: boolean;
   remote_mode: boolean;
-  connected: boolean;
-  // NEW: E-Stop Active State
   e_stop_active: boolean;
-  // NEW: PLC Status with CPU State
-  plc: PLCStatus;
+  
+  // Old fields - keep for compatibility
+  ring_stiffness?: number;
+  force_at_target?: number;
+  sn_class?: number;
+  test_passed?: boolean;
+  upper_limit?: boolean;
+  lower_limit?: boolean;
+  e_stop?: boolean;
+  start_button?: boolean;
+  load_cell_raw?: number;
 }
+
+// Test Stage Names
+export const TEST_STAGE_NAMES: Record<number, string> = {
+  0: 'Idle - Ready',
+  1: 'Initializing...',
+  2: 'Moving to Home...',
+  3: 'Approaching Sample...',
+  4: 'Establishing Contact...',
+  5: 'Testing in Progress...',
+  6: 'Recording Results...',
+  7: 'Returning Home...',
+  8: 'Test Complete',
+  99: 'ERROR - Check Alarm'
+};
+
+// Alarm Messages
+export const ALARM_MESSAGES: Record<number, { text: string; severity: 'info' | 'warning' | 'error' | 'critical' }> = {
+  0: { text: 'No Alarm', severity: 'info' },
+  1: { text: 'E-STOP PRESSED!', severity: 'critical' },
+  2: { text: 'Servo Fault', severity: 'error' },
+  3: { text: 'Upper Limit Reached', severity: 'warning' },
+  4: { text: 'Lower Limit Reached', severity: 'warning' },
+  5: { text: 'Max Force Exceeded', severity: 'error' },
+  6: { text: 'No Sample Detected', severity: 'warning' },
+  7: { text: 'Test Stopped', severity: 'info' },
+};
 
 // Test parameters
 export interface TestParameters {
   pipe_diameter: number;
   pipe_length: number;
   deflection_percent: number;
+  deflection_target: number;
   test_speed: number;
   max_stroke: number;
   max_force: number;
+  preload_force: number;
+  approach_speed: number;
+  contact_speed: number;
+  return_speed: number;
   connected: boolean;
 }
 
@@ -78,7 +216,7 @@ export interface TestDataPoint {
   position: number | null;
 }
 
-// Alarm
+// Alarm record
 export interface Alarm {
   id: number;
   alarm_code: string;
@@ -120,4 +258,36 @@ export interface ConnectionStatus {
 export interface ModeResponse {
   remote_mode: boolean;
   mode: 'local' | 'remote';
+}
+
+// Network types
+export interface WifiNetwork {
+  ssid: string;
+  signal: number;
+  security: string;
+}
+
+export interface WifiStatus {
+  connected: boolean;
+  ssid: string | null;
+  ip_address: string | null;
+}
+
+export interface LanStatus {
+  mode: 'static' | 'dhcp';
+  ip_address: string | null;
+  subnet_mask: string;
+  gateway: string | null;
+  connected: boolean;
+}
+
+export interface WifiScanResponse {
+  networks: WifiNetwork[];
+}
+
+export interface LanConfigRequest {
+  mode: 'static' | 'dhcp';
+  ip_address?: string;
+  subnet_mask?: string;
+  gateway?: string;
 }

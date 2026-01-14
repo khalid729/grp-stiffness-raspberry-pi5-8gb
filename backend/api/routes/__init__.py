@@ -1,3 +1,3 @@
-from . import status, commands, reports, demo
+from . import status, commands, reports, demo, network
 
-__all__ = ["status", "commands", "reports", "demo"]
+__all__ = ["status", "commands", "reports", "demo", "network"]

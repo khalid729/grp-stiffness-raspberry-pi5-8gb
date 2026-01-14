@@ -24,6 +24,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLiveData, useJogControl } from '@/hooks/useLiveData';
 import { useServoControl, useClampControl, useModeControl, useCommands } from '@/hooks/useApi';
+import { StepControl } from '@/components/StepControl';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
@@ -189,11 +190,18 @@ const ManualControl = () => {
       )}
 
       {/* Live Values Row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <StatusCard
           title={t('dashboard.force')}
-          value={liveData.actual_force.toFixed(2)}
-          unit="kN"
+          value={(liveData.actual_force * 1000).toFixed(0)}
+          unit="N"
+          icon={<Gauge className="w-5 h-5" />}
+          variant="info"
+        />
+        <StatusCard
+          title="Weight"
+          value={((liveData.actual_force * 1000) / 9.81).toFixed(1)}
+          unit="kg"
           icon={<Gauge className="w-5 h-5" />}
           variant="info"
         />
@@ -224,6 +232,8 @@ const ManualControl = () => {
       {/* Control Cards Grid */}
       <div className="control-grid">
         {/* Jog Control */}
+        <StepControl />
+
         <Card className="industrial-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base lg:text-lg">{t('manual.jogControl')}</CardTitle>
@@ -279,6 +289,7 @@ const ManualControl = () => {
         </Card>
 
         {/* Clamp Control */}
+
         <Card className="industrial-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base lg:text-lg">{t('manual.clampControl')}</CardTitle>
@@ -333,7 +344,10 @@ const ManualControl = () => {
           </CardContent>
         </Card>
 
+        {/* Step Movement Control */}
+
         {/* Servo Control */}
+
         <Card className="industrial-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base lg:text-lg">{t('manual.servoControl')}</CardTitle>

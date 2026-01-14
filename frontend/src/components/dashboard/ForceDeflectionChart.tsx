@@ -52,7 +52,7 @@ export function ForceDeflectionChart({
             fontSize={12}
             tickFormatter={(value) => `${value.toFixed(1)}`}
             label={{ 
-              value: 'Force (kN)', 
+              value: 'Force (N)', 
               angle: -90, 
               position: 'insideLeft',
               fill: 'hsl(var(--muted-foreground))',

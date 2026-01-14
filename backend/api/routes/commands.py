@@ -26,9 +26,51 @@ class ModeResponse(BaseModel):
     mode: str  # "local" or "remote"
 
 
+class SafetyStatus(BaseModel):
+    e_stop: bool
+    upper_limit: bool
+    lower_limit: bool
+    home: bool
+    safety_ok: bool
+    motion_allowed: bool
+
+
 def _check_service():
     if command_service is None:
         raise HTTPException(status_code=503, detail="Command service not initialized")
+
+
+# ========== TARE / ZERO ==========
+
+@router.post("/tare", response_model=CommandResponse)
+async def tare_loadcell():
+    """Zero/Tare the load cell - DB2.DBX60.0"""
+    _check_service()
+    result = command_service.tare_loadcell()
+    return CommandResponse(
+        success=result["success"],
+        message=result["message"]
+    )
+
+
+@router.post("/zero-position", response_model=CommandResponse)
+async def zero_position():
+    """Zero the position display - DB4.DBX59.7"""
+    _check_service()
+    result = command_service.zero_position()
+    return CommandResponse(
+        success=result["success"],
+        message=result["message"]
+    )
+
+
+# ========== Safety Status ==========
+
+@router.get("/safety", response_model=SafetyStatus)
+async def get_safety_status():
+    """Get all safety status bits"""
+    _check_service()
+    return command_service.get_safety_status()
 
 
 # ========== Test Control ==========
@@ -37,10 +79,10 @@ def _check_service():
 async def start_test():
     """Start automated test"""
     _check_service()
-    success = command_service.start_test()
+    result = command_service.start_test()
     return CommandResponse(
-        success=success,
-        message="Test started" if success else "Failed to start test"
+        success=result["success"],
+        message=result["message"]
     )
 
 
@@ -59,10 +101,10 @@ async def emergency_stop():
 async def go_home():
     """Move to home position"""
     _check_service()
-    success = command_service.home()
+    result = command_service.home()
     return CommandResponse(
-        success=success,
-        message="Homing started" if success else "Failed to start homing"
+        success=result["success"],
+        message=result["message"]
     )
 
 
@@ -121,10 +163,10 @@ async def set_jog_speed(request: JogSpeedRequest):
 async def jog_forward_start():
     """Start jog forward (down)"""
     _check_service()
-    success = command_service.jog_forward(True)
+    result = command_service.jog_forward(True)
     return CommandResponse(
-        success=success,
-        message="Jog forward started" if success else "Failed to start jog"
+        success=result.get("success", False),
+        message=result.get("message", "Jog forward started") if result.get("success") else result.get("message", "Failed")
     )
 
 
@@ -132,10 +174,10 @@ async def jog_forward_start():
 async def jog_forward_stop():
     """Stop jog forward"""
     _check_service()
-    success = command_service.jog_forward(False)
+    result = command_service.jog_forward(False)
     return CommandResponse(
-        success=success,
-        message="Jog forward stopped" if success else "Failed to stop jog"
+        success=result.get("success", False),
+        message="Jog forward stopped"
     )
 
 
@@ -143,10 +185,10 @@ async def jog_forward_stop():
 async def jog_backward_start():
     """Start jog backward (up)"""
     _check_service()
-    success = command_service.jog_backward(True)
+    result = command_service.jog_backward(True)
     return CommandResponse(
-        success=success,
-        message="Jog backward started" if success else "Failed to start jog"
+        success=result.get("success", False),
+        message=result.get("message", "Jog backward started") if result.get("success") else result.get("message", "Failed")
     )
 
 
@@ -154,10 +196,10 @@ async def jog_backward_start():
 async def jog_backward_stop():
     """Stop jog backward"""
     _check_service()
-    success = command_service.jog_backward(False)
+    result = command_service.jog_backward(False)
     return CommandResponse(
-        success=success,
-        message="Jog backward stopped" if success else "Failed to stop jog"
+        success=result.get("success", False),
+        message="Jog backward stopped"
     )
 
 
@@ -213,10 +255,10 @@ async def get_mode():
 async def set_local_mode():
     """Switch to Local mode (Physical buttons)"""
     _check_service()
-    success = command_service.set_remote_mode(False)
+    result = command_service.set_remote_mode(False)
     return CommandResponse(
-        success=success,
-        message="Switched to Local mode" if success else "Failed to switch mode"
+        success=result["success"],
+        message=result["message"]
     )
 
 
@@ -224,8 +266,63 @@ async def set_local_mode():
 async def set_remote_mode():
     """Switch to Remote mode (Web interface)"""
     _check_service()
-    success = command_service.set_remote_mode(True)
+    result = command_service.set_remote_mode(True)
     return CommandResponse(
-        success=success,
-        message="Switched to Remote mode" if success else "Failed to switch mode"
+        success=result["success"],
+        message=result["message"]
     )
+
+
+# ========== Step Movement Control ==========
+
+class StepDistanceRequest(BaseModel):
+    distance: float  # mm (0.1 - 100)
+
+
+class StepStatusResponse(BaseModel):
+    distance: float
+    active: bool
+    done: bool
+
+
+@router.post("/step/distance", response_model=CommandResponse)
+async def set_step_distance(request: StepDistanceRequest):
+    """Set step distance in mm (0.1 - 100)"""
+    _check_service()
+    if request.distance < 0.1 or request.distance > 100:
+        raise HTTPException(status_code=400, detail="Distance must be between 0.1 and 100 mm")
+    
+    result = command_service.set_step_distance(request.distance)
+    return CommandResponse(
+        success=result["success"],
+        message=f"Step distance set to {result.get('distance', request.distance)} mm" if result["success"] else result.get("message", "Failed")
+    )
+
+
+@router.post("/step/forward", response_model=CommandResponse)
+async def step_forward():
+    """Execute one step down (toward sample)"""
+    _check_service()
+    result = command_service.step_forward()
+    return CommandResponse(
+        success=result["success"],
+        message="Step forward" if result["success"] else result.get("error", "Failed")
+    )
+
+
+@router.post("/step/backward", response_model=CommandResponse)
+async def step_backward():
+    """Execute one step up (away from sample)"""
+    _check_service()
+    result = command_service.step_backward()
+    return CommandResponse(
+        success=result["success"],
+        message="Step backward" if result["success"] else result.get("error", "Failed")
+    )
+
+
+@router.get("/step/status", response_model=StepStatusResponse)
+async def get_step_status():
+    """Get current step movement status"""
+    _check_service()
+    return command_service.get_step_status()
