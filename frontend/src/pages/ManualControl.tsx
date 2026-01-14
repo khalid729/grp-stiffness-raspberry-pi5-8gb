@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
 import { ModeSelector } from '@/components/ModeSelector';
 import { StatusCard } from '@/components/dashboard/StatusCard';
 import { MachineIndicator } from '@/components/dashboard/MachineIndicator';
 import { TouchButton } from '@/components/ui/TouchButton';
 import { EStopButton } from '@/components/ui/EStopButton';
+import { NumericKeypad, useNumericKeypad } from '@/components/ui/NumericKeypad';
 import {
   ChevronUp,
   ChevronDown,
@@ -37,8 +37,15 @@ const ManualControl = () => {
   const { setMode } = useModeControl();
   const { stopTest } = useCommands();
 
-  const [jogSpeedLocal, setJogSpeedLocal] = useState(50);
+  const [jogSpeedActive, setJogSpeedActive] = useState(50);
   const [isJogging, setIsJogging] = useState<'up' | 'down' | null>(null);
+
+  // Speed limits
+  const MIN_SPEED = 1.2;
+  const MAX_SPEED = 6000;
+
+  // Numeric keypad hook
+  const { openKeypad, keypadProps } = useNumericKeypad();
 
   // Track active jog state to prevent rapid on/off toggling
   const jogUpActive = useRef(false);
@@ -86,12 +93,22 @@ const ManualControl = () => {
     setMode.mutate(remoteMode);
   };
 
-  // Handle jog speed change
-  const handleJogSpeedChange = useCallback((value: number[]) => {
-    const speed = value[0];
-    setJogSpeedLocal(speed);
-    setJogSpeed(speed);
-  }, [setJogSpeed]);
+  // Open speed keypad
+  const handleOpenSpeedKeypad = useCallback(() => {
+    if (jogDisabled) return;
+    openKeypad({
+      initialValue: jogSpeedActive.toString(),
+      title: t('manual.speed') || 'Jog Speed',
+      min: MIN_SPEED,
+      max: MAX_SPEED,
+      unit: 'mm/min',
+      onConfirm: (value) => {
+        const speed = parseFloat(value);
+        setJogSpeedActive(speed);
+        setJogSpeed(speed);
+      },
+    });
+  }, [jogSpeedActive, jogDisabled, openKeypad, setJogSpeed, t]);
 
   // Jog Up (backward) - simple start, global handler will stop
   const handleJogUpStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
@@ -254,21 +271,29 @@ const ManualControl = () => {
               <span className="pointer-events-none">{t('manual.jogUp')}</span>
             </button>
 
-            {/* Speed Slider */}
-            <div className="space-y-3 py-2">
+            {/* Speed Input with Numeric Keypad */}
+            <div className="space-y-2 py-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground font-medium">{t('manual.speed')}</span>
-                <span className="font-mono font-bold text-foreground">{jogSpeedLocal} mm/min</span>
               </div>
-              <Slider
-                value={[jogSpeedLocal]}
-                onValueChange={handleJogSpeedChange}
-                min={1}
-                max={100}
-                step={1}
-                className="touch-slider"
+              <button
+                onClick={handleOpenSpeedKeypad}
                 disabled={jogDisabled}
-              />
+                className={cn(
+                  "w-full p-4 rounded-xl border-2 border-border bg-secondary/30",
+                  "hover:bg-secondary/50 hover:border-primary/50 transition-all",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "flex items-center justify-center gap-2"
+                )}
+              >
+                <span className="text-2xl font-mono font-bold text-primary">
+                  {jogSpeedActive}
+                </span>
+                <span className="text-lg text-muted-foreground">mm/min</span>
+              </button>
+              <p className="text-xs text-muted-foreground text-center">
+                {t('manual.tapToEdit') || 'Tap to edit'} • Min: {MIN_SPEED} | Max: {MAX_SPEED}
+              </p>
             </div>
 
             {/* Jog Down Button */}
@@ -407,6 +432,9 @@ const ManualControl = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Numeric Keypad Modal */}
+      <NumericKeypad {...keypadProps} />
     </div>
   );
 };

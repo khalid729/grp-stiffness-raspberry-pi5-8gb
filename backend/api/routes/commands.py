@@ -149,8 +149,8 @@ async def reset_servo_alarm():
 async def set_jog_speed(request: JogSpeedRequest):
     """Set jog velocity (mm/min)"""
     _check_service()
-    if request.velocity < 1 or request.velocity > 100:
-        raise HTTPException(status_code=400, detail="Velocity must be between 1 and 100 mm/min")
+    if request.velocity < 1.2 or request.velocity > 6000:
+        raise HTTPException(status_code=400, detail="Velocity must be between 1.2 and 6000 mm/min")
 
     success = command_service.set_jog_velocity(request.velocity)
     return CommandResponse(

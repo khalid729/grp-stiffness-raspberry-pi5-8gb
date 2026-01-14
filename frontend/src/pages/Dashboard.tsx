@@ -260,15 +260,23 @@ const Dashboard = () => {
         <h3 className="text-sm lg:text-base font-semibold mb-3 text-muted-foreground">
           {t('dashboard.machineIndicators')}
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <MachineIndicator
             label={t('dashboard.servoReady')}
             isActive={liveData.servo_ready || liveData.servo?.ready || false}
           />
           <MachineIndicator
+            label={t('dashboard.servoEnabled')}
+            isActive={liveData.servo_enabled || liveData.servo?.enabled || false}
+          />
+          <MachineIndicator
             label={t('dashboard.servoError')}
             isActive={liveData.servo_error || liveData.servo?.error || false}
             isError={liveData.servo_error || liveData.servo?.error || false}
+          />
+          <MachineIndicator
+            label={t('dashboard.atHome')}
+            isActive={liveData.at_home || liveData.servo?.at_home || false}
           />
           <MachineIndicator
             label={t('dashboard.upperLock')}
@@ -277,10 +285,6 @@ const Dashboard = () => {
           <MachineIndicator
             label={t('dashboard.lowerLock')}
             isActive={liveData.lock_lower || liveData.clamps?.lower || false}
-          />
-          <MachineIndicator
-            label={t('dashboard.atHome')}
-            isActive={liveData.at_home || liveData.servo?.at_home || false}
           />
         </div>
       </div>

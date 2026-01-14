@@ -59,7 +59,7 @@ class CommandService:
     # ═══════════════════════════════════════════════════════════════════
     # DB3 - REAL VALUES
     # ═══════════════════════════════════════════════════════════════════
-    CMD_JOG_VELOCITY = 16          # DB3.DBD16 - Jog Speed (Real)
+    CMD_JOG_VELOCITY_SETPOINT = 26          # DB3.DBD26 - Jog Speed (Real)
 
     # ═══════════════════════════════════════════════════════════════════
     # DB4 - HMI COMMANDS
@@ -207,8 +207,8 @@ class CommandService:
         """Set jog speed - DB3.DBD16 (mm/min)"""
         if not self._check_connection():
             return False
-        velocity = max(1.0, min(100.0, velocity))
-        result = self.plc.write_real(self.DB_SERVO, self.CMD_JOG_VELOCITY, velocity)
+        velocity = max(1.2, min(6000.0, velocity))
+        result = self.plc.write_real(self.DB_SERVO, self.CMD_JOG_VELOCITY_SETPOINT, velocity)
         logger.info(f"Jog velocity: {velocity} mm/min (DB3.DBD16)")
         return result
 

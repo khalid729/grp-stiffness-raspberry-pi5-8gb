@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TouchButton } from '@/components/ui/TouchButton';
-import { Input } from '@/components/ui/input';
+import { NumericKeypad, useNumericKeypad } from '@/components/ui/NumericKeypad';
 import { ChevronUp, ChevronDown, Settings2 } from 'lucide-react';
 import { useStepControl } from '@/hooks/useApi';
 import { useLiveData } from '@/hooks/useLiveData';
@@ -13,12 +13,15 @@ export function StepControl() {
   const { setStepDistance, stepForward, stepBackward } = useStepControl();
   
   const [distance, setDistance] = useState<number>(10.0);
-  
+
+  // Numeric keypad hook
+  const { openKeypad, keypadProps } = useNumericKeypad();
+
   // Get step and safety data from liveData
   const step = liveData.step || { distance: 0, active: false, done: false };
   const safety = liveData.safety || { ok: true, motion_allowed: true };
   const isLocalMode = !liveData.remote_mode && !(liveData.mode?.remote);
-  
+
   // Sync distance from PLC on mount
   useEffect(() => {
     if (step.distance > 0) {
@@ -26,12 +29,22 @@ export function StepControl() {
     }
   }, []);
 
-  const handleSetDistance = () => {
-    if (distance < 0.1 || distance > 100) {
-      return;
-    }
-    setStepDistance.mutate(distance);
-  };
+  // Open distance keypad
+  const handleOpenDistanceKeypad = useCallback(() => {
+    if (step.active) return;
+    openKeypad({
+      initialValue: distance.toString(),
+      title: t('step.distance') || 'Step Distance',
+      min: 0.1,
+      max: 100,
+      unit: 'mm',
+      onConfirm: (value) => {
+        const dist = parseFloat(value);
+        setDistance(dist);
+        setStepDistance.mutate(dist);
+      },
+    });
+  }, [distance, step.active, openKeypad, setStepDistance, t]);
 
   const handleStepUp = () => {
     stepBackward.mutate();
@@ -50,35 +63,34 @@ export function StepControl() {
         {t('step.title') || 'Step Movement'}
       </h3>
 
-      {/* Distance Input */}
-      <div className="flex items-center gap-2 mb-4">
-        <label className="text-sm text-muted-foreground">
+      {/* Distance Input with Keypad */}
+      <div className="mb-4">
+        <label className="text-sm text-muted-foreground block mb-2">
           {t('step.distance') || 'Distance'}:
         </label>
-        <Input
-          type="number"
-          value={distance}
-          onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
-          step="0.1"
-          min="0.1"
-          max="100"
+        <button
+          onClick={handleOpenDistanceKeypad}
           disabled={step.active}
-          className="w-24 h-9"
-        />
-        <span className="text-sm text-muted-foreground">mm</span>
-        <TouchButton
-          variant="outline"
-          size="sm"
-          onClick={handleSetDistance}
-          disabled={setStepDistance.isPending || step.active || distance < 0.1 || distance > 100}
+          className={cn(
+            "w-full p-3 rounded-xl border-2 border-border bg-secondary/30",
+            "hover:bg-secondary/50 hover:border-primary/50 transition-all",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            "flex items-center justify-center gap-2"
+          )}
         >
-          {setStepDistance.isPending ? '...' : (t('step.set') || 'Set')}
-        </TouchButton>
+          <span className="text-xl font-mono font-bold text-primary">
+            {distance.toFixed(1)}
+          </span>
+          <span className="text-sm text-muted-foreground">mm</span>
+        </button>
+        <p className="text-xs text-muted-foreground text-center mt-1">
+          {t('manual.tapToEdit') || 'Tap to edit'} • Min: 0.1 | Max: 100 mm
+        </p>
       </div>
 
       {/* Current PLC Distance */}
-      <div className="text-sm text-muted-foreground mb-4">
-        {t('step.plcDistance') || 'PLC Distance'}: {step.distance?.toFixed(1) || '0.0'} mm
+      <div className="text-xs text-muted-foreground mb-4 text-center">
+        PLC: {step.distance?.toFixed(1) || '0.0'} mm
       </div>
 
       {/* Step Buttons */}
@@ -135,6 +147,9 @@ export function StepControl() {
           {t('step.safetyWarning') || 'Safety interlock active - Step disabled'}
         </div>
       )}
+
+      {/* Numeric Keypad Modal */}
+      <NumericKeypad {...keypadProps} />
     </div>
   );
 }
