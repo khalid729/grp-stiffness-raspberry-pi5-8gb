@@ -83,7 +83,7 @@ const ManualControl = () => {
   const isLocalMode = !liveData.remote_mode;
   const jogDisabled = isLocalMode || !isConnected;  // Jog needs Remote mode
   const commandsDisabled = !isConnected;  // Other commands work in any mode
-  const isTestRunning = liveData.test_status === 2;
+  const isTestRunning = liveData.test_status === 3;
   const isMoving = isJogging !== null;
   const isEStopActive = liveData.e_stop_active;
   const isPLCStop = liveData.plc?.cpu_state === 'stop';

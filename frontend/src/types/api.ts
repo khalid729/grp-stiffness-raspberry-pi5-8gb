@@ -32,10 +32,10 @@ export interface DeflectionData {
   target: number;
 }
 
-// Test status
+// Test status - stage: 0=idle, 1=init, 2=zero, 3=testing, 4=record, 5=return, 6=complete, 99=error
 export interface TestData {
-  status: number;
-  stage: number;
+  status: number; // -1: disconnected, 0-5: mapped from stage
+  stage: number;  // FC2 state: 0=idle, 1=init, 2=zero, 3=testing, 4=record, 5=return, 6=complete, 99=error
   progress: number;
   recording: boolean;
   preload_reached: boolean;

@@ -89,6 +89,18 @@ export function useJogControl() {
   return { jogForward, jogBackward, setJogSpeed };
 }
 
+// Test stage names matching new FC2 state machine (manual contact)
+const stageNames: Record<number, string> = {
+  0: 'Idle - Ready',
+  1: 'Initializing...',
+  2: 'Zeroing Position...',
+  3: 'Testing in Progress...',
+  4: 'Recording Results...',
+  5: 'Returning to Contact...',
+  6: 'Test Complete',
+  99: 'ERROR - Check Alarm',
+};
+
 // Test status helper
 export function useTestStatus() {
   const { liveData, isConnected } = useLiveData();
@@ -96,24 +108,13 @@ export function useTestStatus() {
   const statusMap: Record<number, string> = {
     [-1]: 'disconnected',
     0: 'idle',
-    1: 'starting',
-    2: 'testing',
-    3: 'atTarget',
-    4: 'returning',
-    5: 'complete',
-  };
-
-  const stageNames: Record<number, string> = {
-    0: 'Idle - Ready',
-    1: 'Initializing...',
-    2: 'Moving to Home...',
-    3: 'Approaching Sample...',
-    4: 'Establishing Contact...',
-    5: 'Testing in Progress...',
-    6: 'Recording Results...',
-    7: 'Returning Home...',
-    8: 'Test Complete',
-    99: 'ERROR - Check Alarm',
+    1: 'initializing',
+    2: 'zeroing',
+    3: 'testing',
+    4: 'recording',
+    5: 'returning',
+    6: 'complete',
+    99: 'error',
   };
 
   const testStage = liveData.test?.stage ?? 0;
@@ -126,7 +127,7 @@ export function useTestStatus() {
     stageName: stageNames[testStage] || 'Unknown',
     progress: testProgress,
     isConnected,
-    isRunning: liveData.test_status === 2 || (testStage >= 1 && testStage <= 7),
-    isComplete: liveData.test_status === 5 || testStage === 8,
+    isRunning: testStage >= 1 && testStage <= 5,
+    isComplete: testStage === 6,
   };
 }

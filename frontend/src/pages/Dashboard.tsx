@@ -41,7 +41,7 @@ const Dashboard = () => {
   // Mode state
   const isLocalMode = !liveData.remote_mode && !(liveData.mode?.remote);
   const controlsDisabled = isLocalMode || !isConnected;
-  const isTestRunning = liveData.test_status === 2 || (testStage >= 1 && testStage <= 7);
+  const isTestRunning = testStage >= 1 && testStage <= 5;
 
   // Get force value (support both new and old structure)
   const forceKN = liveData.force?.kN ?? liveData.actual_force ?? 0;
@@ -49,7 +49,7 @@ const Dashboard = () => {
 
   // Update chart data when testing
   useEffect(() => {
-    if (liveData.test_status === 2 || isTestRunning) {
+    if (isTestRunning) {
       setChartData(prev => {
         const lastPoint = prev[prev.length - 1];
         const currentDeflection = liveData.deflection?.actual ?? liveData.actual_deflection ?? 0;
@@ -92,7 +92,7 @@ const Dashboard = () => {
     zeroPosition.mutate();
   };
 
-  const testStatus = liveData.test_status as 0 | 1 | 2 | 3 | 4 | 5 | -1;
+  const testStatus = liveData.test_status as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 99 | -1;
   const actualPosition = liveData.position?.actual ?? liveData.actual_position ?? 0;
   const targetDeflection = liveData.deflection?.target ?? liveData.target_deflection ?? 0;
   const actualDeflection = liveData.deflection?.actual ?? liveData.actual_deflection ?? 0;
@@ -191,9 +191,9 @@ const Dashboard = () => {
         
         <StatusCard
           title={t('dashboard.status')}
-          value={t(`status.${['idle', 'starting', 'testing', 'atTarget', 'returning', 'complete'][liveData.test_status] || 'error'}`)}
+          value={t(`status.${['idle', 'initializing', 'zeroing', 'testing', 'recording', 'returning', 'complete'][liveData.test_status] || 'error'}`)}
           icon={<Activity className="w-5 h-5" />}
-          variant={liveData.test_status === 2 ? 'warning' : liveData.test_status === 5 ? 'success' : 'default'}
+          variant={liveData.test_status === 3 ? 'warning' : liveData.test_status === 6 ? 'success' : 'default'}
         />
       </div>
 
