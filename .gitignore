@@ -55,7 +55,6 @@ yarn-error.log*
 
 # Build output
 frontend/dist/
-backend/static/
 
 # OS
 .DS_Store
